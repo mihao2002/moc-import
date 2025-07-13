@@ -236,7 +236,7 @@ public static class LDrawPartLoader
                                 //bool isMirrored = MatrixIsMirrored(transform);
 
                                 // Final winding decision
-                                bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW) ^ isMirrored;
+                                bool invertFace = invertNext ^ isMirrored;
 
                                 Debug.Log($"{filePath} -> {referencedPartId}-{invertFace}");
                                 // bool invertFace = invertNext ^ mirrorXform ^ !isCW;

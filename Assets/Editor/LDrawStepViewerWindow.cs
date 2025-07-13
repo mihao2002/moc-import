@@ -9,6 +9,7 @@ public class LDrawStepViewerWindow : EditorWindow
 {
     private string ldrawFilePath = "C:/Users/mihao/OneDrive/Documents/test.ldr";
     private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
+    private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
     private List<LDrawStep> steps = new List<LDrawStep>();
     private int currentStep = 0;
     private List<GameObject> spawnedParts = new List<GameObject>();
@@ -42,6 +43,16 @@ public class LDrawStepViewerWindow : EditorWindow
                 partLibraryPath = path;
         }
         EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.BeginHorizontal();
+        unofficialPartLibraryPath = EditorGUILayout.TextField("Unofficial Part Library Path", unofficialPartLibraryPath);
+        if (GUILayout.Button("...", GUILayout.Width(30)))
+        {
+            string path = EditorUtility.OpenFolderPanel("Select LDraw Unofficial Part Library Folder", "", "");
+            if (!string.IsNullOrEmpty(path))
+                unofficialPartLibraryPath = path;
+        }
+        EditorGUILayout.EndHorizontal();        
 
         if (GUILayout.Button("Load LDraw File"))
         {
@@ -80,7 +91,7 @@ public class LDrawStepViewerWindow : EditorWindow
 
         steps = LDrawParser.Parse(ldrawFilePath);
         // LDrawPart p = new LDrawPart{
-        //     partId = "4-4cylo.dat",
+        //     partId = "confric.dat",
         //     position = Vector3.zero,
         //     rotation = Quaternion.identity};
         // steps = new List<LDrawStep>();
@@ -174,7 +185,7 @@ public static class LDrawParser
                     ) * 0.01f;
 
                     // Swap Y and Z for Unity coordinate system
-                    part.position = new Vector3(posLDraw.x, posLDraw.y, posLDraw.z);
+                    part.position = new Vector3(posLDraw.x, posLDraw.y, -posLDraw.z);
 
                     // Parse rotation matrix columns in LDraw order
                     Matrix4x4 mLDraw = new Matrix4x4();
