@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace LDraw.Runtime
+namespace LDraw.Editor
 {
     public class LDrawColorTable : ScriptableObject
     {

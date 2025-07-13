@@ -33,17 +33,50 @@ namespace LDraw.Editor
         private static Dictionary<string, LDrawMesh> meshCache = new Dictionary<string, LDrawMesh>();
         private static HashSet<string> loadingParts = new HashSet<string>();
 
+        public static Mesh SaveMeshAsset(Mesh mesh, string meshName)
+        {
+            string meshFolder = "Assets/LDrawMeshes";
+            if (!Directory.Exists(meshFolder))
+            {
+                Directory.CreateDirectory(meshFolder);
+                AssetDatabase.Refresh();
+            }
+
+            string meshAssetPath = Path.Combine(meshFolder, meshName + ".asset");
+
+            // Check if mesh asset already exists to avoid overwriting
+            Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshAssetPath);
+            if (existingMesh != null)
+            {
+                return existingMesh; // reuse existing asset
+            }
+
+            // Create new mesh asset
+            Mesh newMesh = UnityEngine.Object.Instantiate(mesh);
+            newMesh.name = meshName;
+            AssetDatabase.CreateAsset(newMesh, meshAssetPath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Debug.Log($"Saved mesh asset at {meshAssetPath}");
+            return newMesh;
+        }
+
         public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath)
         {
             GameObject go = new GameObject(part.partId);
 
             LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath);
-            if (ldrawMesh != null)
+            if (ldrawMesh != null && ldrawMesh.mesh != null)
             {
                 Mesh mesh = ldrawMesh.mesh;
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
 
-                // Create a default white material for the prefab (no color baked in)
+                // Save mesh as asset and get asset reference
+                Mesh meshAsset = SaveMeshAsset(mesh, part.partId);
+
+                go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
+
+                // Create a default white material (no color baked in)
                 var defaultMat = new Material(Shader.Find("Standard"));
                 defaultMat.color = Color.white;
                 go.AddComponent<MeshRenderer>().sharedMaterial = defaultMat;
@@ -54,8 +87,11 @@ namespace LDraw.Editor
 
                 string prefabPath = Path.Combine(prefabFolder, $"{part.partId}.prefab");
 
-                // Save and connect prefab asset (overwrite if exists)
-                PrefabUtility.SaveAsPrefabAssetAndConnect(go, prefabPath, InteractionMode.AutomatedAction);
+                // Save prefab (not connect to scene, just create asset)
+                PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+
+                // Clean up the temporary object
+                // GameObject.DestroyImmediate(go);
             }
             else
             {

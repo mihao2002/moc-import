@@ -63,6 +63,7 @@
     <Compile Include="Assets\Scripts\Editor\LDrawParser.cs" />
     <Compile Include="Assets\Scripts\Editor\LDrawStepViewerWindow.cs" />
     <Compile Include="Assets\Scripts\Editor\LDrawColorManager.cs" />
+    <Compile Include="Assets\Scripts\Editor\LDrawColorTable.cs" />
     <Compile Include="Assets\Scripts\Editor\LDrawPartLoader.cs" />
   </ItemGroup>
   <ItemGroup>
