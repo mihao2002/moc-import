@@ -63,23 +63,6 @@ namespace LDraw.Editor
             }
 
             Debug.Log($"Loaded {_colorTable.Count} colors from LDConfig.ldr");
-
-            // Save to ScriptableObject for runtime use
-            SaveColorTableAsset(colorEntries);
-        }
-
-
-        private static void SaveColorTableAsset(List<LDrawColorEntry> entries)
-        {
-            string assetPath = "Assets/Resources/LDrawColorTable.asset";
-            var asset = ScriptableObject.CreateInstance<LDrawColorTable>();
-            asset.colors = entries;
-
-            Directory.CreateDirectory("Assets/Resources");
-            AssetDatabase.CreateAsset(asset, assetPath);
-            AssetDatabase.SaveAssets();
-
-            Debug.Log($"Saved LDrawColorTable.asset with {entries.Count} colors to Resources folder.");
         }
 
         public static Color GetColor(int code)

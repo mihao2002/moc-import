@@ -84,12 +84,5 @@ namespace LDraw.Runtime
 
             steps = JsonUtility.FromJson<LDrawStepListWrapper>(stepDataJson.text).steps;
         }
-
-        // Wrapper to deserialize list in JsonUtility
-        [System.Serializable]
-        private class LDrawStepListWrapper
-        {
-            public List<LDrawStep> steps;
-        }
     }
 }
