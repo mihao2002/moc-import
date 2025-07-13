@@ -79,6 +79,16 @@ public class LDrawStepViewerWindow : EditorWindow
         LDrawPartLoader.ClearCache();
 
         steps = LDrawParser.Parse(ldrawFilePath);
+        // LDrawPart p = new LDrawPart{
+        //     partId = "4-4cylo.dat",
+        //     position = Vector3.zero,
+        //     rotation = Quaternion.identity};
+        // steps = new List<LDrawStep>();
+        // List<LDrawPart> parts = new List<LDrawPart>();
+        // LDrawStep step = new LDrawStep();
+        // step.parts.Add(p);
+        // steps.Add(step);
+        
         currentStep = 0;
         ShowStep(currentStep);
     }
@@ -155,18 +165,38 @@ public static class LDrawParser
                 {
                     var part = new LDrawPart();
                     part.partId = tokens[14].ToLower();
-                    float x = float.Parse(tokens[2]);
-                    float y = float.Parse(tokens[3]);
-                    float z = float.Parse(tokens[4]);
-                    part.position = new Vector3(x, y, z) * 0.01f;
-                    Matrix4x4 m = new Matrix4x4();
-                    m.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
-                    m.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
-                    m.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
-                    m.SetColumn(3, new Vector4(0, 0, 0, 1));
-                    part.rotation = m.rotation;
+
+                    // Parse LDraw position (mm) and convert to meters
+                    Vector3 posLDraw = new Vector3(
+                        float.Parse(tokens[2]),
+                        float.Parse(tokens[3]),
+                        float.Parse(tokens[4])
+                    ) * 0.01f;
+
+                    // Swap Y and Z for Unity coordinate system
+                    part.position = new Vector3(posLDraw.x, posLDraw.z, posLDraw.y);
+
+                    // Parse rotation matrix columns in LDraw order
+                    Matrix4x4 mLDraw = new Matrix4x4();
+                    mLDraw.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
+                    mLDraw.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
+                    mLDraw.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
+                    mLDraw.SetColumn(3, new Vector4(0, 0, 0, 1));
+
+                    // Swap Y and Z columns of rotation matrix to convert from LDraw to Unity
+                    Matrix4x4 mUnity = new Matrix4x4();
+                    mUnity.SetColumn(0, mLDraw.GetColumn(0));       // X stays X
+                    mUnity.SetColumn(1, mLDraw.GetColumn(2));       // Y = original Z
+                    mUnity.SetColumn(2, mLDraw.GetColumn(1));       // Z = original Y
+                    mUnity.SetColumn(3, new Vector4(0, 0, 0, 1));
+
+                    part.rotation = mUnity.rotation;
+
+
+                    // Color
                     int colorCode = int.Parse(tokens[1]);
                     part.color = LDrawColorManager.GetColor(colorCode);
+
                     currentStep.parts.Add(part);
                 }
             }
