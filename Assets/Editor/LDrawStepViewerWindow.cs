@@ -174,7 +174,7 @@ public static class LDrawParser
                     ) * 0.01f;
 
                     // Swap Y and Z for Unity coordinate system
-                    part.position = new Vector3(posLDraw.x, posLDraw.z, posLDraw.y);
+                    part.position = new Vector3(posLDraw.x, posLDraw.y, posLDraw.z);
 
                     // Parse rotation matrix columns in LDraw order
                     Matrix4x4 mLDraw = new Matrix4x4();
@@ -183,15 +183,15 @@ public static class LDrawParser
                     mLDraw.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
                     mLDraw.SetColumn(3, new Vector4(0, 0, 0, 1));
 
-                    // Swap Y and Z columns of rotation matrix to convert from LDraw to Unity
-                    Matrix4x4 mUnity = new Matrix4x4();
-                    mUnity.SetColumn(0, mLDraw.GetColumn(0));       // X stays X
-                    mUnity.SetColumn(1, mLDraw.GetColumn(2));       // Y = original Z
-                    mUnity.SetColumn(2, mLDraw.GetColumn(1));       // Z = original Y
-                    mUnity.SetColumn(3, new Vector4(0, 0, 0, 1));
+                    // // Swap Y and Z columns of rotation matrix to convert from LDraw to Unity
+                    // Matrix4x4 mUnity = new Matrix4x4();
+                    // mUnity.SetColumn(0, mLDraw.GetColumn(0));       // X stays X
+                    // mUnity.SetColumn(1, mLDraw.GetColumn(2));       // Y = original Z
+                    // mUnity.SetColumn(2, mLDraw.GetColumn(1));       // Z = original Y
+                    // mUnity.SetColumn(3, new Vector4(0, 0, 0, 1));
 
-                    part.rotation = mUnity.rotation;
-
+                    Matrix4x4 RL = LDrawPartLoader.negateZ * mLDraw * LDrawPartLoader.negateZ;
+                    part.rotation = RL.rotation;
 
                     // Color
                     int colorCode = int.Parse(tokens[1]);

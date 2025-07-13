@@ -13,12 +13,19 @@ public class LDrawMesh
 
 public static class LDrawPartLoader
 {
-    public static readonly Matrix4x4 swapYZ = new Matrix4x4(
+    public static readonly Matrix4x4 swapYZ1 = new Matrix4x4(
         new Vector4(1, 0, 0, 0),   // X stays X
         new Vector4(0, 0, 1, 0),   // Y becomes Z
         new Vector4(0, 1, 0, 0),   // Z becomes Y
         new Vector4(0, 0, 0, 1)    // Homogeneous coordinate
     );
+
+    public static readonly Matrix4x4 negateZ = new Matrix4x4(
+        new Vector4(1, 0, 0, 0),   // X stays X
+        new Vector4(0, 1, 0, 0),   // Y becomes Z
+        new Vector4(0, 0, -1, 0),   // Z becomes Y
+        new Vector4(0, 0, 0, 1)    // Homogeneous coordinate
+    );    
 
     private static Dictionary<string, LDrawMesh> meshCache = new Dictionary<string, LDrawMesh>();
     private static HashSet<string> loadingParts = new HashSet<string>();
@@ -153,6 +160,11 @@ public static class LDrawPartLoader
             $"{m.m30:F4}\t{m.m31:F4}\t{m.m32:F4}\t{m.m33:F4}";
     }
 
+    private static Vector3 NegateZ(Vector3 v)
+    {
+        return new Vector3(v.x, v.y, -v.z);
+    }
+
     private static LDrawMesh ParseDatFileToMesh(string filePath, string partLibraryPath)
     {
         var lines = File.ReadAllLines(filePath);
@@ -211,7 +223,7 @@ public static class LDrawPartLoader
                             transform.SetColumn(3, new Vector4(tx, ty, tz, 1));
 
                             bool isMirrored = MatrixIsMirrored(transform);
-                            //transform = swapYZ * transform;
+                            transform = negateZ * transform * negateZ;
 
                             LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath);
                             if (ldrawMesh != null)
@@ -234,10 +246,9 @@ public static class LDrawPartLoader
                                 //Debug.Log(MatrixToString(transform));
                                 foreach (var v in referencedMesh.vertices)
                                 {
-                                    var v1 = swapYZ.MultiplyPoint3x4(v);
-                                    Vector3 v2 = transform.MultiplyPoint3x4(v1);
-                                    Vector3 worldPos = swapYZ.MultiplyPoint3x4(v2);
-                                    allVertices.Add(worldPos);
+                                    Vector3 v2 = transform.MultiplyPoint3x4(v);
+                                    //Vector3 worldPos = NegateZ(v2);
+                                    allVertices.Add(v2);
                                 }
 
                                 //Apply correct winding if mirrored
@@ -278,9 +289,9 @@ public static class LDrawPartLoader
                             Vector3 v3 = new Vector3(float.Parse(tokens[8]), float.Parse(tokens[9]), float.Parse(tokens[10])) * 0.01f;
 
                             int baseIdx = allVertices.Count;
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v1));
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v2));
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v3));
+                            allVertices.Add(NegateZ(v1));
+                            allVertices.Add(NegateZ(v2));
+                            allVertices.Add(NegateZ(v3));
 
                             bool invertFace = invertNext ^ !isCW;
                             if (invertFace)
@@ -308,10 +319,10 @@ public static class LDrawPartLoader
                             Vector3 v4 = new Vector3(float.Parse(tokens[11]), float.Parse(tokens[12]), float.Parse(tokens[13])) * 0.01f;
 
                             int baseIdx = allVertices.Count;
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v1));
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v2));
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v3));
-                            allVertices.Add(swapYZ.MultiplyPoint3x4(v4));
+                            allVertices.Add(NegateZ(v1));
+                            allVertices.Add(NegateZ(v2));
+                            allVertices.Add(NegateZ(v3));
+                            allVertices.Add(NegateZ(v4));
 
                             bool invertFace = invertNext ^ !isCW;
                             if (invertFace)
