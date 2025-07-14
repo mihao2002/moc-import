@@ -14,8 +14,8 @@ namespace LDraw.Editor
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
         private List<LDrawStep> steps = new List<LDrawStep>();
-        private int currentStep = 0;
         private List<GameObject> spawnedParts = new List<GameObject>();
+        private Dictionary<string, List<List<GameObject>>> modelStepObjects = new Dictionary<string, List<List<GameObject>>>();
 
         [MenuItem("Tools/LDraw Step Viewer")]
         public static void ShowWindow()
@@ -62,24 +62,34 @@ namespace LDraw.Editor
                 LoadLDrawFile();
             }
 
-            if (steps.Count > 0)
+            if (flatSteps.Count > 0)
             {
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField($"Step {currentStep + 1} / {steps.Count}");
+                EditorGUILayout.LabelField($"Step {flatStepIndex + 1} / {flatSteps.Count} | Model: {currentContextModel}");
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Previous Step"))
                 {
-                    ShowStep(currentStep - 1);
+                    if (flatStepIndex > 0)
+                    {
+                        flatStepIndex--;
+                        ShowFlatStep();
+                    }
                 }
                 if (GUILayout.Button("Next Step"))
                 {
-                    ShowStep(currentStep + 1);
+                    if (flatStepIndex < flatSteps.Count - 1)
+                    {
+                        flatStepIndex++;
+                        ShowFlatStep();
+                    }
                 }
                 EditorGUILayout.EndHorizontal();
             }
         }
 
-        private List<List<GameObject>> stepObjects = new List<List<GameObject>>(); // Add this field
+        private List<LDrawParser.FlatStep> flatSteps = new List<LDrawParser.FlatStep>();
+        private int flatStepIndex = 0;
+        private string currentContextModel = LDrawParser.mainModelName;
 
         void LoadLDrawFile()
         {
@@ -94,78 +104,81 @@ namespace LDraw.Editor
 
             LDrawPartLoader.ClearCache();
 
-            steps = LDrawParser.Parse(ldrawFilePath);
-
-            LDrawParser.SaveStepsToJsonAsset(steps);
-
-            currentStep = 0;
-
-            // Clear previous objects
-            ClearParts();
-            stepObjects.Clear();
-
-            // Preload meshes and create prefabs for all steps
-            for (int i = 0; i < steps.Count; i++)
+            var models = LDrawParser.ParseModels(ldrawFilePath);
+            flatSteps = LDrawParser.FlattenSteps(models);
+            modelStepObjects.Clear();
+            foreach (var kvp in models)
             {
-                var objs = new List<GameObject>();
-                foreach (var part in steps[i].parts)
+                var stepObjs = new List<List<GameObject>>();
+                foreach (var step in kvp.Value)
                 {
-                    GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath);
-                    var meshRenderer = go.GetComponent<MeshRenderer>();
-                    if (meshRenderer != null)
+                    var objs = new List<GameObject>();
+                    foreach (var part in step.parts)
                     {
-                        meshRenderer.sharedMaterial.color = part.color;
+                        GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
+                        var meshRenderer = go.GetComponent<MeshRenderer>();
+                        if (meshRenderer != null)
+                        {
+                            meshRenderer.sharedMaterial.color = part.color;
+                        }
+                        go.SetActive(false);
+                        objs.Add(go);
                     }
-                    go.SetActive(false); // Hide initially
-                    objs.Add(go);
+                    stepObjs.Add(objs);
                 }
-                stepObjects.Add(objs);
+                modelStepObjects[kvp.Key] = stepObjs;
             }
 
-            ShowStep(currentStep);
+            flatStepIndex = 0;
+            currentContextModel = flatSteps.Count > 0 ? flatSteps[0].modelName : LDrawParser.mainModelName;
+            ShowFlatStep();
         }
 
-        void ShowStep(int stepIndex)
+        void ShowFlatStep()
         {
-            if (stepIndex < 0 || stepIndex >= steps.Count)
+            if (flatStepIndex < 0 || flatStepIndex >= flatSteps.Count)
                 return;
-
-            // Hide all objects
-            foreach (var objs in stepObjects)
+            var flatStep = flatSteps[flatStepIndex];
+            currentContextModel = flatStep.modelName;
+            // Hide all objects in all models
+            foreach (var stepObjs in modelStepObjects.Values)
             {
-                foreach (var go in objs)
+                foreach (var objs in stepObjs)
                 {
-                    if (go != null)
-                        go.SetActive(false);
+                    foreach (var go in objs)
+                    {
+                        if (go != null)
+                            go.SetActive(false);
+                    }
                 }
             }
-
-            currentStep = stepIndex;
-
-            // Show all objects up to current step (cumulative build)
-            for (int i = 0; i <= currentStep; i++)
+            // Show all objects up to and including the current step in the current context model
+            var stepList = modelStepObjects[currentContextModel];
+            for (int i = 0; i <= flatStep.stepIndexInModel && i < stepList.Count; i++)
             {
-                foreach (var go in stepObjects[i])
+                foreach (var go in stepList[i])
                 {
                     if (go != null)
                         go.SetActive(true);
                 }
             }
-
             SceneView.RepaintAll();
         }
 
         void ClearParts()
         {
-            foreach (var objs in stepObjects)
+            foreach (var stepObjs in modelStepObjects.Values)
             {
-                foreach (var go in objs)
+                foreach (var objs in stepObjs)
                 {
-                    if (go != null)
-                        UnityEngine.Object.DestroyImmediate(go);
+                    foreach (var go in objs)
+                    {
+                        if (go != null)
+                            UnityEngine.Object.DestroyImmediate(go);
+                    }
                 }
             }
-            stepObjects.Clear();
+            modelStepObjects.Clear();
         }
 
         void OnDisable()
@@ -174,3 +187,4 @@ namespace LDraw.Editor
         }
     }
 }
+

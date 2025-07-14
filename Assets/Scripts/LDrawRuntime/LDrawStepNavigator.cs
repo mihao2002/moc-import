@@ -11,6 +11,9 @@ namespace LDraw.Runtime
         private int currentStepIndex = -1;
         private List<GameObject> spawnedParts = new List<GameObject>();
         private string stepDataJson; // This should contain serialized step data (LDrawSteps)
+        private Stack<List<GameObject>> hiddenMeshStack = new Stack<List<GameObject>>();
+        private List<GameObject> visibleMeshes = new List<GameObject>();
+        private List<List<GameObject>> stepObjects = new List<List<GameObject>>();
 
         void Start()
         {
@@ -46,45 +49,71 @@ namespace LDraw.Runtime
 
         private void ShowStep(int stepIndex)
         {
-            ClearSpawnedParts();
-
-            currentStepIndex = stepIndex;
-
-            for (int i = 0; i <= currentStepIndex; i++)
+            // Hide all currently active objects
+            foreach (var go in visibleMeshes)
             {
-                foreach (var part in steps[i].parts)
+                if (go != null)
+                    go.SetActive(false);
+            }
+            visibleMeshes.Clear();
+
+            hiddenMeshStack.Clear();
+            List<GameObject> activeObjects = new List<GameObject>();
+            for (int i = 0; i <= stepIndex; i++)
+            {
+                var step = steps[i];
+                // Ensure stepObjects is populated for this step
+                while (stepObjects.Count <= i)
                 {
-                    GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{part.partId}");
-                    if (prefab == null)
+                    var objs = new List<GameObject>();
+                    foreach (var part in steps[i].parts)
                     {
-                        Debug.LogWarning($"Missing prefab for part: {part.partId}");
-                        continue;
-                    }
-
-                    Debug.Log($"Spawning {part.partId} at {part.position}");
-
-                    GameObject go = Instantiate(prefab, parentContainer);
-                    go.transform.localPosition = part.position;
-                    go.transform.localRotation = part.rotation;
-
-                    Debug.DrawRay(go.transform.position, Vector3.up * 0.1f, Color.red, 5f);
-
-                    var renderer = go.GetComponent<Renderer>();
-                    if (renderer != null)
-                    {
-                        var baseMat = Resources.Load<Material>("DefaultLDrawMaterial");
-                        if (baseMat != null)
+                        GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{part.partId}");
+                        if (prefab == null)
                         {
-                            renderer.material = new Material(baseMat);
-                            renderer.material.color = part.color;
+                            Debug.LogWarning($"Missing prefab for part: {part.partId}");
+                            continue;
+                        }
+                        GameObject go = Instantiate(prefab, parentContainer);
+                        go.transform.localPosition = part.position;
+                        go.transform.localRotation = part.rotation;
+                        var renderer = go.GetComponent<Renderer>();
+                        if (renderer != null)
+                        {
+                            var baseMat = Resources.Load<Material>("DefaultLDrawMaterial");
+                            if (baseMat != null)
+                            {
+                                renderer.material = new Material(baseMat);
+                                renderer.material.color = part.color;
+                            }
+                        }
+                        objs.Add(go);
+                    }
+                    stepObjects.Add(objs);
+                }
+                foreach (var go in stepObjects[i])
+                {
+                    if (go != null)
+                    {
+                        go.SetActive(true);
+                        activeObjects.Add(go);
+                    }
+                }
+                if (hiddenMeshStack.Count > 0)
+                {
+                    var toRestore = hiddenMeshStack.Pop();
+                    foreach (var go in toRestore)
+                    {
+                        if (go != null)
+                        {
+                            go.SetActive(true);
+                            activeObjects.Add(go);
                         }
                     }
-
-                    Debug.Log($"Instantiated {part.partId}, renderer: {renderer}, color: {part.color}");
-
-                    spawnedParts.Add(go);
                 }
             }
+            visibleMeshes = activeObjects;
+            currentStepIndex = stepIndex;
         }
 
         private void ClearSpawnedParts()

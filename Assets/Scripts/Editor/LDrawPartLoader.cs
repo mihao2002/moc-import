@@ -62,11 +62,11 @@ namespace LDraw.Editor
             return newMesh;
         }
 
-        public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath)
+        public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
             GameObject go = new GameObject(part.partId);
 
-            LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath);
+            LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models);
             if (ldrawMesh != null && ldrawMesh.mesh != null)
             {
                 Mesh mesh = ldrawMesh.mesh;
@@ -166,8 +166,10 @@ namespace LDraw.Editor
             return null;
         }
 
-        private static LDrawMesh LoadMeshFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath)
+        // Overload: allow passing in-memory models for submodel mesh generation
+        public static LDrawMesh LoadMeshFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
+            Debug.Log($"Loading mesh for {partId}, {(models != null ? string.Join(", ", models.Keys) : "null")}");
             if (meshCache.ContainsKey(partId))
                 return meshCache[partId];
 
@@ -177,20 +179,74 @@ namespace LDraw.Editor
                 return null;
             }
 
-            LDrawMesh ldrawMesh = LoadMeshFromPath(partId, partLibraryPath, unofficialPartLibraryPath);
-            if (ldrawMesh != null)
+            // Check if this is an in-memory submodel
+            if (models != null && models.ContainsKey(partId))
             {
+                Debug.Log($"Loading mesh for {partId} from in-memory models");
+                loadingParts.Add(partId);
+                // Recursively build mesh for submodel by combining all its steps/parts
+                var allMeshes = new List<Mesh>();
+                foreach (var step in models[partId])
+                {
+                    foreach (var part in step.parts)
+                    {
+                        // Recursively get mesh for each part
+                        LDrawMesh subMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models);
+                        if (subMesh != null && subMesh.mesh != null)
+                        {
+                            // Transform mesh to part's position/rotation
+                            Mesh meshCopy = UnityEngine.Object.Instantiate(subMesh.mesh);
+                            Vector3[] verts = meshCopy.vertices;
+                            for (int i = 0; i < verts.Length; i++)
+                            {
+                                verts[i] = part.rotation * verts[i] + part.position;
+                            }
+                            meshCopy.vertices = verts;
+                            meshCopy.RecalculateBounds();
+                            allMeshes.Add(meshCopy);
+                        }
+                    }
+                }
+                // Combine all meshes into one
+                Mesh combined = CombineMeshes(allMeshes);
+                var ldrawMesh = new LDrawMesh { mesh = combined, isCW = true };
                 meshCache[partId] = ldrawMesh;
+                loadingParts.Remove(partId);
+                return ldrawMesh;
+            }
+
+            // Fallback: load from part library as before
+            LDrawMesh ldrawMeshFallback = LoadMeshFromPath(partId, partLibraryPath, unofficialPartLibraryPath, models);
+            if (ldrawMeshFallback != null)
+            {
+                meshCache[partId] = ldrawMeshFallback;
             }
             else
             {
                 Debug.LogWarning($"Failed to parse mesh for {partId} - returned null");
             }
-
-            return ldrawMesh;
+            return ldrawMeshFallback;
         }
 
-        private static LDrawMesh LoadMeshFromPath(string partId, string partLibraryPath, string unofficialPartLibraryPath)
+        // Helper to combine multiple meshes into one
+        private static Mesh CombineMeshes(List<Mesh> meshes)
+        {
+            if (meshes.Count == 0) return null;
+            if (meshes.Count == 1) return meshes[0];
+            var combine = new CombineInstance[meshes.Count];
+            for (int i = 0; i < meshes.Count; i++)
+            {
+                combine[i].mesh = meshes[i];
+                combine[i].transform = Matrix4x4.identity;
+            }
+            Mesh combined = new Mesh();
+            combined.CombineMeshes(combine, true, false);
+            combined.RecalculateBounds();
+            combined.RecalculateNormals();
+            return combined;
+        }
+
+        private static LDrawMesh LoadMeshFromPath(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
             string datPath = FindPartFile(partId, partLibraryPath, unofficialPartLibraryPath);
             if (datPath == null)
@@ -202,7 +258,7 @@ namespace LDraw.Editor
             try
             {
                 loadingParts.Add(partId);
-                LDrawMesh ldrawMesh = ParseDatFileToMesh(datPath, partLibraryPath, unofficialPartLibraryPath);
+                LDrawMesh ldrawMesh = ParseDatFileToMesh(datPath, partLibraryPath, unofficialPartLibraryPath, models);
                 loadingParts.Remove(partId);
 
                 return ldrawMesh;
@@ -236,7 +292,7 @@ namespace LDraw.Editor
             return new Vector3(v.x, v.y, -v.z);
         }
 
-        private static LDrawMesh ParseDatFileToMesh(string filePath, string partLibraryPath, string unofficialPartLibraryPath)
+        private static LDrawMesh ParseDatFileToMesh(string filePath, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
             var lines = File.ReadAllLines(filePath);
             var allVertices = new List<Vector3>();
@@ -296,7 +352,7 @@ namespace LDraw.Editor
                                 bool isMirrored = MatrixIsMirrored(transform);
                                 transform = negateZ * transform * negateZ;
 
-                                LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath, unofficialPartLibraryPath);
+                                LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath, unofficialPartLibraryPath, models);
                                 if (ldrawMesh != null)
                                 {
                                     //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
