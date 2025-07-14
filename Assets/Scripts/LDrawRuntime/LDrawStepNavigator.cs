@@ -71,7 +71,14 @@ namespace LDraw.Runtime
 
                     var renderer = go.GetComponent<Renderer>();
                     if (renderer != null)
-                        renderer.material.color = part.color;
+                    {
+                        var baseMat = Resources.Load<Material>("DefaultLDrawMaterial");
+                        if (baseMat != null)
+                        {
+                            renderer.material = new Material(baseMat);
+                            renderer.material.color = part.color;
+                        }
+                    }
 
                     Debug.Log($"Instantiated {part.partId}, renderer: {renderer}, color: {part.color}");
 
