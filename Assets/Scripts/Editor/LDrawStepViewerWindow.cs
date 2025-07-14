@@ -79,6 +79,8 @@ namespace LDraw.Editor
             }
         }
 
+        private List<List<GameObject>> stepObjects = new List<List<GameObject>>(); // Add this field
+
         void LoadLDrawFile()
         {
             if (!File.Exists(ldrawFilePath))
@@ -93,19 +95,33 @@ namespace LDraw.Editor
             LDrawPartLoader.ClearCache();
 
             steps = LDrawParser.Parse(ldrawFilePath);
-            // LDrawPart p = new LDrawPart{
-            //     partId = "confric.dat",
-            //     position = Vector3.zero,
-            //     rotation = Quaternion.identity};
-            // steps = new List<LDrawStep>();
-            // List<LDrawPart> parts = new List<LDrawPart>();
-            // LDrawStep step = new LDrawStep();
-            // step.parts.Add(p);
-            // steps.Add(step);
 
             LDrawParser.SaveStepsToJsonAsset(steps);
 
             currentStep = 0;
+
+            // Clear previous objects
+            ClearParts();
+            stepObjects.Clear();
+
+            // Preload meshes and create prefabs for all steps
+            for (int i = 0; i < steps.Count; i++)
+            {
+                var objs = new List<GameObject>();
+                foreach (var part in steps[i].parts)
+                {
+                    GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath);
+                    var meshRenderer = go.GetComponent<MeshRenderer>();
+                    if (meshRenderer != null)
+                    {
+                        meshRenderer.sharedMaterial.color = part.color;
+                    }
+                    go.SetActive(false); // Hide initially
+                    objs.Add(go);
+                }
+                stepObjects.Add(objs);
+            }
+
             ShowStep(currentStep);
         }
 
@@ -114,34 +130,42 @@ namespace LDraw.Editor
             if (stepIndex < 0 || stepIndex >= steps.Count)
                 return;
 
-            currentStep = stepIndex;
-            ClearParts();
-
-            for (int i = 0; i <= currentStep; i++)
+            // Hide all objects
+            foreach (var objs in stepObjects)
             {
-                foreach (var part in steps[i].parts)
+                foreach (var go in objs)
                 {
-                    GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath);
-                    // Set color dynamically here for editor visualization
-                    var meshRenderer = go.GetComponent<MeshRenderer>();
-                    if (meshRenderer != null)
-                    {
-                        meshRenderer.sharedMaterial.color = part.color;
-                    }
-                    spawnedParts.Add(go);
+                    if (go != null)
+                        go.SetActive(false);
                 }
             }
+
+            currentStep = stepIndex;
+
+            // Show all objects up to current step (cumulative build)
+            for (int i = 0; i <= currentStep; i++)
+            {
+                foreach (var go in stepObjects[i])
+                {
+                    if (go != null)
+                        go.SetActive(true);
+                }
+            }
+
             SceneView.RepaintAll();
         }
 
         void ClearParts()
         {
-            foreach (var go in spawnedParts)
+            foreach (var objs in stepObjects)
             {
-                if (go != null)
-                    UnityEngine.Object.DestroyImmediate(go);
+                foreach (var go in objs)
+                {
+                    if (go != null)
+                        UnityEngine.Object.DestroyImmediate(go);
+                }
             }
-            spawnedParts.Clear();
+            stepObjects.Clear();
         }
 
         void OnDisable()
