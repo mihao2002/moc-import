@@ -82,71 +82,42 @@ namespace LDraw.Editor
 
         public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
-            GameObject go = new GameObject(part.partId);
-
-            LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models);
-            if (ldrawMesh != null && ldrawMesh.mesh != null)
+            // Only the top-level call should create a prefab for regular parts
+            LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models, true);
+            GameObject go = null;
+            if (ldrawMesh != null)
             {
-                if (models != null && models.ContainsKey(part.partId))
+                string prefabPath = $"Assets/Resources/LDrawPrefabs/{part.partId}.prefab";
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+
+                if (prefab != null)
                 {
-                    string prefabPath = $"Assets/Resources/LDrawPrefabs/{part.partId}.prefab";
-                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-                    if (prefab != null)
+                    go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    if (models == null || !models.ContainsKey(part.partId))
                     {
-                        go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                        go.transform.position = part.position;
-                        go.transform.rotation = part.rotation;
-                        return go;
+                        // Add MeshRenderer and assign material
+                        var meshRenderer = go.GetComponent<MeshRenderer>();
+                        if (meshRenderer == null)
+                            meshRenderer = go.AddComponent<MeshRenderer>();
+                        meshRenderer.sharedMaterial = GetOrCreateMaterial(part.color);
+                        var meshFilter = go.GetComponent<MeshFilter>();
                     }
-                    else
-                    {
-                        Debug.LogWarning($"Missing prefab for submodel: {part.partId}");
-                        // Fallback to empty GameObject
-                        go = new GameObject(part.partId + " (missing prefab)");
-                        go.transform.position = part.position;
-                        go.transform.rotation = part.rotation;
-                        return go;
-                    }
-                }
-                else
-                {
-                    Mesh mesh = ldrawMesh.mesh;
-
-                    // Save mesh as asset and get asset reference
-                    Mesh meshAsset = SaveMeshAsset(mesh, part.partId);
-
-                    go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
-                    go.AddComponent<MeshRenderer>().sharedMaterial = GetOrCreateMaterial(part.color);
-
-                    string prefabFolder = "Assets/Resources/LDrawPrefabs";
-                    if (!Directory.Exists(prefabFolder))
-                        Directory.CreateDirectory(prefabFolder);
-
-                    string prefabPath = Path.Combine(prefabFolder, $"{part.partId}.prefab");
-
-                    // Save prefab (not connect to scene, just create asset)
-                    PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
-
-                    // Clean up the temporary object
-                    // GameObject.DestroyImmediate(go);
                 }
             }
-            else
-            {
-                // Don't create prefab for placeholder cube, just create a visual cube in scene
+            
+            if (go == null)
+            {                
+                go = new GameObject(part.partId + " (missing prefab)");
                 var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.AddComponent<MeshFilter>().sharedMesh = cube.GetComponent<MeshFilter>().sharedMesh;
                 go.AddComponent<MeshRenderer>().sharedMaterial = cube.GetComponent<MeshRenderer>().sharedMaterial;
                 UnityEngine.Object.DestroyImmediate(cube);
-                go.name = part.partId + " (missing mesh)";
+                go.name = part.partId + " (missing mesh)";  
             }
 
             go.transform.position = part.position;
             go.transform.rotation = part.rotation;
-
-            Debug.Log(part.partId);
-            Debug.Log(MatrixToString(Matrix4x4.Rotate(part.rotation)));
-
+            //Debug.Log(MatrixToString(Matrix4x4.Rotate(part.rotation)));
             return go;
         }
        
@@ -204,10 +175,10 @@ namespace LDraw.Editor
             return null;
         }
 
-        // Overload: allow passing in-memory models for submodel mesh generation
-        public static LDrawMesh LoadMeshFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
+        // Overload: allow passing in-memory models for submodel mesh generation, and indicate if this is a top-level part
+        public static LDrawMesh LoadMeshFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models, bool isTopLevel = false)
         {
-            Debug.Log($"Loading mesh for {partId}, {(models != null ? string.Join(", ", models.Keys) : "null")}");
+            Debug.Log($"Loading mesh for {partId}, {(models != null ? string.Join(", ", models.Keys) : "null")}, isTopLevel={isTopLevel}");
             if (meshCache.ContainsKey(partId))
                 return meshCache[partId];
 
@@ -224,14 +195,14 @@ namespace LDraw.Editor
                 loadingParts.Add(partId);
 
                 // Group meshes by color
-                var colorToInstances = new Dictionary<Color, List<CombineInstance>>();
+                var colorToInstances = new Dictionary<object, List<CombineInstance>>(); // Changed to object to handle both Color and Material
 
                 foreach (var step in models[partId])
                 {
                     foreach (var part in step.parts)
                     {
                         // Recursively get mesh for each part
-                        LDrawMesh subMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models);
+                        LDrawMesh subMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models, true);
                         if (subMesh != null && subMesh.mesh != null)
                         {
                             // Transform mesh to part's position/rotation
@@ -244,27 +215,59 @@ namespace LDraw.Editor
                             meshCopy.vertices = verts;
                             meshCopy.RecalculateBounds();
 
-                            var ci = new CombineInstance
+                            // If the part is a submodel, add all its submeshes and materials
+                            if (models.ContainsKey(part.partId) && meshCopy.subMeshCount > 1)
                             {
-                                mesh = meshCopy,
-                                transform = Matrix4x4.identity
-                            };
-
-                            if (!colorToInstances.ContainsKey(part.color))
-                                colorToInstances[part.color] = new List<CombineInstance>();
-
-                            colorToInstances[part.color].Add(ci);
+                                for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
+                                {
+                                    Mesh submesh = new Mesh();
+                                    submesh.vertices = meshCopy.vertices;
+                                    submesh.triangles = meshCopy.GetTriangles(subIdx);
+                                    submesh.RecalculateBounds();
+                                    var ci = new CombineInstance
+                                    {
+                                        mesh = submesh,
+                                        transform = Matrix4x4.identity
+                                    };
+                                    // Use the corresponding material from the submodel prefab
+                                    var submodelPrefabPath = $"Assets/Resources/LDrawPrefabs/{part.partId}.prefab";
+                                    var submodelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(submodelPrefabPath);
+                                    Material mat = null;
+                                    if (submodelPrefab != null)
+                                    {
+                                        var subRenderer = submodelPrefab.GetComponent<MeshRenderer>();
+                                        if (subRenderer != null && subIdx < subRenderer.sharedMaterials.Length)
+                                            mat = subRenderer.sharedMaterials[subIdx];
+                                    }
+                                    if (mat == null) mat = GetOrCreateMaterial(part.color); // fallback
+                                    if (!colorToInstances.ContainsKey(mat))
+                                        colorToInstances[mat] = new List<CombineInstance>();
+                                    colorToInstances[mat].Add(ci);
+                                }
+                            }
+                            else
+                            {
+                                // Regular part or single-mesh submodel: group by color
+                                var ci = new CombineInstance
+                                {
+                                    mesh = meshCopy,
+                                    transform = Matrix4x4.identity
+                                };
+                                if (!colorToInstances.ContainsKey(part.color))
+                                    colorToInstances[part.color] = new List<CombineInstance>();
+                                colorToInstances[part.color].Add(ci);
+                            }
                         }
                     }
                 }
 
-                // Combine meshes by color group into submeshes
+                // Combine meshes by color/material group into submeshes
                 var subMeshList = new List<CombineInstance>();
                 var materialList = new List<Material>();
 
                 foreach (var kvp in colorToInstances)
                 {
-                    var color = kvp.Key;
+                    var matOrColor = kvp.Key;
                     var groupMesh = new Mesh();
                     groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // merge into one mesh
                     subMeshList.Add(new CombineInstance
@@ -272,10 +275,11 @@ namespace LDraw.Editor
                         mesh = groupMesh,
                         transform = Matrix4x4.identity
                     });
-
-                    // Get or create a shared material for this color
-                    var mat = GetOrCreateMaterial(color); // you must implement this to load/save shared .mat files
-                    materialList.Add(mat);
+                    // If key is a Material, use it; if it's a Color, create material
+                    if (matOrColor is Material mat)
+                        materialList.Add(mat);
+                    else if (matOrColor is Color color)
+                        materialList.Add(GetOrCreateMaterial(color));
                 }
 
                 // Final combined mesh with multiple submeshes (1 per color)
@@ -309,6 +313,27 @@ namespace LDraw.Editor
             if (ldrawMeshFallback != null)
             {
                 meshCache[partId] = ldrawMeshFallback;
+
+                // Prefab creation for regular parts if this is the top-level call
+                if (isTopLevel && ldrawMeshFallback.mesh != null)
+                {
+                    GameObject go = new GameObject(partId);
+                    Mesh meshAsset = SaveMeshAsset(ldrawMeshFallback.mesh, partId);
+                    go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
+                    // !!! Why do I have to assign material here???
+                    // var meshRenderer = go.GetComponent<MeshRenderer>();
+                    // if (meshRenderer == null)
+                    //     meshRenderer = go.AddComponent<MeshRenderer>();
+                    // meshRenderer.sharedMaterial = GetOrCreateMaterial(Color.white);
+                    // Do NOT add MeshRenderer or assign material here for regular parts
+                    string prefabFolder = "Assets/Resources/LDrawPrefabs";
+                    if (!Directory.Exists(prefabFolder))
+                        Directory.CreateDirectory(prefabFolder);
+                    string prefabPath = Path.Combine(prefabFolder, $"{partId}.prefab");
+                    PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+                    Debug.Log($"Saved Prefab {partId}");
+                    UnityEngine.Object.DestroyImmediate(go);
+                }
             }
             else
             {
@@ -441,7 +466,7 @@ namespace LDraw.Editor
                                 bool isMirrored = MatrixIsMirrored(transform);
                                 transform = negateZ * transform * negateZ;
 
-                                LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath, unofficialPartLibraryPath, models);
+                                LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath, unofficialPartLibraryPath, models, false);
                                 if (ldrawMesh != null)
                                 {
                                     //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
