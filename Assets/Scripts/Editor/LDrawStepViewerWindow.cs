@@ -149,11 +149,6 @@ namespace LDraw.Editor
                     foreach (var part in step.parts)
                     {
                         GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
-                        var meshRenderer = go.GetComponent<MeshRenderer>();
-                        if (meshRenderer != null)
-                        {
-                            meshRenderer.sharedMaterial.color = part.color;
-                        }
                         go.SetActive(false);
                         objs.Add(go);
                     }

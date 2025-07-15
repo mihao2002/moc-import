@@ -62,6 +62,24 @@ namespace LDraw.Editor
             return newMesh;
         }
 
+        public static Material GetOrCreateMaterial(Color color)
+        {
+            string materialFolder = "Assets/Resources/LDrawMaterials";
+            if (!Directory.Exists(materialFolder))
+                Directory.CreateDirectory(materialFolder);
+
+            string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            string matPath = Path.Combine(materialFolder, $"Mat_{colorKey}.mat");
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (existing != null) return existing;
+
+            var mat = new Material(Shader.Find("Standard"));
+            mat.color = color;
+            AssetDatabase.CreateAsset(mat, matPath);
+            AssetDatabase.SaveAssets();
+            return mat;
+        }
+
         public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
             GameObject go = new GameObject(part.partId);
@@ -75,11 +93,7 @@ namespace LDraw.Editor
                 Mesh meshAsset = SaveMeshAsset(mesh, part.partId);
 
                 go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
-
-                // Create a default white material (no color baked in)
-                var defaultMat = new Material(Shader.Find("Standard"));
-                defaultMat.color = Color.white;
-                go.AddComponent<MeshRenderer>().sharedMaterial = defaultMat;
+                go.AddComponent<MeshRenderer>().sharedMaterial = GetOrCreateMaterial(part.color);
 
                 string prefabFolder = "Assets/Resources/LDrawPrefabs";
                 if (!Directory.Exists(prefabFolder))
