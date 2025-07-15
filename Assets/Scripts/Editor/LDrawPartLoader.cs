@@ -35,7 +35,7 @@ namespace LDraw.Editor
 
         public static Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
-            string meshFolder = "Assets/LDrawMeshes";
+            string meshFolder = "Assets/Resources/LDrawMeshes";
             if (!Directory.Exists(meshFolder))
             {
                 Directory.CreateDirectory(meshFolder);
@@ -87,25 +87,49 @@ namespace LDraw.Editor
             LDrawMesh ldrawMesh = LoadMeshFromLibrary(part.partId, partLibraryPath, unofficialPartLibraryPath, models);
             if (ldrawMesh != null && ldrawMesh.mesh != null)
             {
-                Mesh mesh = ldrawMesh.mesh;
+                if (models != null && models.ContainsKey(part.partId))
+                {
+                    string prefabPath = $"Assets/Resources/LDrawPrefabs/{part.partId}.prefab";
+                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                    if (prefab != null)
+                    {
+                        go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                        go.transform.position = part.position;
+                        go.transform.rotation = part.rotation;
+                        return go;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Missing prefab for submodel: {part.partId}");
+                        // Fallback to empty GameObject
+                        go = new GameObject(part.partId + " (missing prefab)");
+                        go.transform.position = part.position;
+                        go.transform.rotation = part.rotation;
+                        return go;
+                    }
+                }
+                else
+                {
+                    Mesh mesh = ldrawMesh.mesh;
 
-                // Save mesh as asset and get asset reference
-                Mesh meshAsset = SaveMeshAsset(mesh, part.partId);
+                    // Save mesh as asset and get asset reference
+                    Mesh meshAsset = SaveMeshAsset(mesh, part.partId);
 
-                go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
-                go.AddComponent<MeshRenderer>().sharedMaterial = GetOrCreateMaterial(part.color);
+                    go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
+                    go.AddComponent<MeshRenderer>().sharedMaterial = GetOrCreateMaterial(part.color);
 
-                string prefabFolder = "Assets/Resources/LDrawPrefabs";
-                if (!Directory.Exists(prefabFolder))
-                    Directory.CreateDirectory(prefabFolder);
+                    string prefabFolder = "Assets/Resources/LDrawPrefabs";
+                    if (!Directory.Exists(prefabFolder))
+                        Directory.CreateDirectory(prefabFolder);
 
-                string prefabPath = Path.Combine(prefabFolder, $"{part.partId}.prefab");
+                    string prefabPath = Path.Combine(prefabFolder, $"{part.partId}.prefab");
 
-                // Save prefab (not connect to scene, just create asset)
-                PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+                    // Save prefab (not connect to scene, just create asset)
+                    PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
 
-                // Clean up the temporary object
-                // GameObject.DestroyImmediate(go);
+                    // Clean up the temporary object
+                    // GameObject.DestroyImmediate(go);
+                }
             }
             else
             {
@@ -198,8 +222,10 @@ namespace LDraw.Editor
             {
                 Debug.Log($"Loading mesh for {partId} from in-memory models");
                 loadingParts.Add(partId);
-                // Recursively build mesh for submodel by combining all its steps/parts
-                var allMeshes = new List<Mesh>();
+
+                // Group meshes by color
+                var colorToInstances = new Dictionary<Color, List<CombineInstance>>();
+
                 foreach (var step in models[partId])
                 {
                     foreach (var part in step.parts)
@@ -217,15 +243,64 @@ namespace LDraw.Editor
                             }
                             meshCopy.vertices = verts;
                             meshCopy.RecalculateBounds();
-                            allMeshes.Add(meshCopy);
+
+                            var ci = new CombineInstance
+                            {
+                                mesh = meshCopy,
+                                transform = Matrix4x4.identity
+                            };
+
+                            if (!colorToInstances.ContainsKey(part.color))
+                                colorToInstances[part.color] = new List<CombineInstance>();
+
+                            colorToInstances[part.color].Add(ci);
                         }
                     }
                 }
-                // Combine all meshes into one
-                Mesh combined = CombineMeshes(allMeshes);
-                var ldrawMesh = new LDrawMesh { mesh = combined, isCW = true };
+
+                // Combine meshes by color group into submeshes
+                var subMeshList = new List<CombineInstance>();
+                var materialList = new List<Material>();
+
+                foreach (var kvp in colorToInstances)
+                {
+                    var color = kvp.Key;
+                    var groupMesh = new Mesh();
+                    groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // merge into one mesh
+                    subMeshList.Add(new CombineInstance
+                    {
+                        mesh = groupMesh,
+                        transform = Matrix4x4.identity
+                    });
+
+                    // Get or create a shared material for this color
+                    var mat = GetOrCreateMaterial(color); // you must implement this to load/save shared .mat files
+                    materialList.Add(mat);
+                }
+
+                // Final combined mesh with multiple submeshes (1 per color)
+                Mesh finalMesh = new Mesh();
+                finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
+
+                var ldrawMesh = new LDrawMesh { mesh = finalMesh, isCW = true };
                 meshCache[partId] = ldrawMesh;
                 loadingParts.Remove(partId);
+
+                // Save prefab with all submeshes and materials
+                GameObject go = new GameObject(partId);
+                Mesh meshAsset = SaveMeshAsset(finalMesh, partId);
+                go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
+                go.AddComponent<MeshRenderer>().sharedMaterials = materialList.ToArray();
+                Debug.Log($"{materialList.Count} materials, {subMeshList.Count} submeshes");
+
+                string prefabFolder = "Assets/Resources/LDrawPrefabs";
+                if (!Directory.Exists(prefabFolder))
+                    Directory.CreateDirectory(prefabFolder);
+
+                string prefabPath = Path.Combine(prefabFolder, $"{partId}.prefab");
+                PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+                UnityEngine.Object.DestroyImmediate(go);
+
                 return ldrawMesh;
             }
 

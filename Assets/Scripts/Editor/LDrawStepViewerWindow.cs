@@ -29,6 +29,7 @@ namespace LDraw.Editor
         {
             string[] targets = {
                 "Assets/Resources/LDrawPrefabs",
+                "Assets/Resources/LDrawMeshes",
                 "Assets/Resources/LDrawMaterials",
                 "Assets/Resources/LDrawPrefabs.meta",
                 "Assets/Resources/LDrawMaterials.meta",
