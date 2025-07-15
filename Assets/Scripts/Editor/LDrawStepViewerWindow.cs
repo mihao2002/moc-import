@@ -20,7 +20,40 @@ namespace LDraw.Editor
         [MenuItem("Tools/LDraw Step Viewer")]
         public static void ShowWindow()
         {
+            CleanUpResourceFiles();
             GetWindow<LDrawStepViewerWindow>("LDraw Step Viewer");
+        }
+
+        // Delete all generated resource files and folders (prefabs, materials, red material asset, and their .meta files)
+        private static void CleanUpResourceFiles()
+        {
+            string[] targets = {
+                "Assets/Resources/LDrawPrefabs",
+                "Assets/Resources/LDrawMaterials",
+                "Assets/Resources/LDrawPrefabs.meta",
+                "Assets/Resources/LDrawMaterials.meta",
+            };
+
+            foreach (var target in targets)
+            {
+                if (System.IO.Directory.Exists(target))
+                {
+                    // Delete all files in the directory (except .meta)
+                    var files = System.IO.Directory.GetFiles(target);
+                    foreach (var file in files)
+                    {
+                        if (!file.EndsWith(".meta"))
+                            AssetDatabase.DeleteAsset(file.Replace("\\", "/"));
+                    }
+                    // Delete the directory itself (and its .meta)
+                    AssetDatabase.DeleteAsset(target);
+                }
+                else if (System.IO.File.Exists(target))
+                {
+                    AssetDatabase.DeleteAsset(target);
+                }
+            }
+            AssetDatabase.Refresh();
         }
 
         void OnGUI()
