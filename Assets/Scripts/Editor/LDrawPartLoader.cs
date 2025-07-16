@@ -208,11 +208,16 @@ namespace LDraw.Editor
                             // Transform mesh to part's position/rotation
                             Mesh meshCopy = UnityEngine.Object.Instantiate(subMesh.mesh);
                             Vector3[] verts = meshCopy.vertices;
+                            Vector3[] norms = meshCopy.normals;
+
                             for (int i = 0; i < verts.Length; i++)
                             {
-                                verts[i] = part.rotation * verts[i] + part.position;
+                                verts[i] = part.rotation * verts[i] + part.position;  // Transform vertex position
+                                norms[i] = part.rotation * norms[i];                   // Rotate normal direction only
                             }
+
                             meshCopy.vertices = verts;
+                            meshCopy.normals = norms;
                             meshCopy.RecalculateBounds();
 
                             // If the part is a submodel, add all its submeshes and materials
@@ -222,6 +227,7 @@ namespace LDraw.Editor
                                 {
                                     Mesh submesh = new Mesh();
                                     submesh.vertices = meshCopy.vertices;
+                                    submesh.normals = meshCopy.normals;
                                     submesh.triangles = meshCopy.GetTriangles(subIdx);
                                     submesh.RecalculateBounds();
                                     var ci = new CombineInstance
@@ -269,7 +275,7 @@ namespace LDraw.Editor
                 {
                     var matOrColor = kvp.Key;
                     var groupMesh = new Mesh();
-                    groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // merge into one mesh
+                    groupMesh.CombineMeshes(kvp.Value.ToArray(), false, false); // merge into one mesh
                     subMeshList.Add(new CombineInstance
                     {
                         mesh = groupMesh,
@@ -340,24 +346,6 @@ namespace LDraw.Editor
                 Debug.LogWarning($"Failed to parse mesh for {partId} - returned null");
             }
             return ldrawMeshFallback;
-        }
-
-        // Helper to combine multiple meshes into one
-        private static Mesh CombineMeshes(List<Mesh> meshes)
-        {
-            if (meshes.Count == 0) return null;
-            if (meshes.Count == 1) return meshes[0];
-            var combine = new CombineInstance[meshes.Count];
-            for (int i = 0; i < meshes.Count; i++)
-            {
-                combine[i].mesh = meshes[i];
-                combine[i].transform = Matrix4x4.identity;
-            }
-            Mesh combined = new Mesh();
-            combined.CombineMeshes(combine, true, false);
-            combined.RecalculateBounds();
-            combined.RecalculateNormals();
-            return combined;
         }
 
         private static LDrawMesh LoadMeshFromPath(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)

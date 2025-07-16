@@ -62,6 +62,7 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepListWrapper.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\OrbitCamera.cs" />
+    <Compile Include="Assets\Scripts\DrawFaceNormals.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepNavigator.cs" />
   </ItemGroup>
   <ItemGroup>
