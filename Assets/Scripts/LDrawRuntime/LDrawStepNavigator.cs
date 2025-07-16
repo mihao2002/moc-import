@@ -1,72 +1,67 @@
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace LDraw.Runtime
 {
+    [System.Serializable]
+    public class LDrawModelStepData
+    {
+        public List<ModelStepPair> models;
+        public Dictionary<string, List<LDrawStep>> ToDictionary()
+        {
+            var dict = new Dictionary<string, List<LDrawStep>>();
+            if (models != null)
+            {
+                foreach (var pair in models)
+                {
+                    dict[pair.modelName] = pair.steps;
+                }
+            }
+            return dict;
+        }
+    }
+    [System.Serializable]
+    public class ModelStepPair
+    {
+        public string modelName;
+        public List<LDrawStep> steps;
+    }
+
     public class LDrawStepNavigator : MonoBehaviour
     {
         public Transform parentContainer; // Where to spawn parts in the scene
+        public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
 
-        private List<LDrawStep> steps;
-        private int currentStepIndex = -1;
-        private List<GameObject> spawnedParts = new List<GameObject>();
-        private string stepDataJson; // This should contain serialized step data (LDrawSteps)
-        private Stack<List<GameObject>> hiddenMeshStack = new Stack<List<GameObject>>();
-        private List<GameObject> visibleMeshes = new List<GameObject>();
-        private List<List<GameObject>> stepObjects = new List<List<GameObject>>();
+        private Dictionary<string, List<LDrawStep>> models;
+        private List<(string modelName, int stepIndex, int doneSubmodel)> navigationStack = new List<(string, int, int)>();
+        private Dictionary<string, List<List<GameObject>>> modelStepObjects = new Dictionary<string, List<List<GameObject>>>();
 
         void Start()
         {
-            // Auto-load from Resources if not assigned
-            if (stepDataJson == null)
+            // Load model step data from Resources
+            var jsonAsset = Resources.Load<TextAsset>("LDrawStepData");
+            if (jsonAsset == null)
             {
-                var jsonAsset = Resources.Load<TextAsset>("LDrawStepData");
-                stepDataJson = jsonAsset.text;
+                Debug.LogError("LDrawStepData.json not found in Resources!");
+                return;
             }
-                
-
-            LoadStepsFromJson();
-            ShowStep(0); // Start from first step
-        }
-
-        public void ShowNextStep()
-        {
-            Debug.Log("ShowNextStep called");
-            if (currentStepIndex < steps.Count - 1)
+            var wrapper = JsonUtility.FromJson<LDrawModelStepData>(jsonAsset.text);
+            models = wrapper.ToDictionary();
+            if (models == null || models.Count == 0)
             {
-                ShowStep(currentStepIndex + 1);
+                Debug.LogError("No models found in LDrawStepData.json!");
+                return;
             }
-        }
-
-        public void ShowPreviousStep()
-        {
-            Debug.Log("ShowPreviousStep called");
-            if (currentStepIndex > 0)
+            // Pre-instantiate all step objects (but keep them inactive)
+            modelStepObjects.Clear();
+            foreach (var kvp in models)
             {
-                ShowStep(currentStepIndex - 1);
-            }
-        }
-
-        private void ShowStep(int stepIndex)
-        {
-            // Hide all currently active objects
-            foreach (var go in visibleMeshes)
-            {
-                if (go != null)
-                    go.SetActive(false);
-            }
-            visibleMeshes.Clear();
-
-            hiddenMeshStack.Clear();
-            List<GameObject> activeObjects = new List<GameObject>();
-            for (int i = 0; i <= stepIndex; i++)
-            {
-                var step = steps[i];
-                // Ensure stepObjects is populated for this step
-                while (stepObjects.Count <= i)
+                var stepObjs = new List<List<GameObject>>();
+                foreach (var step in kvp.Value)
                 {
                     var objs = new List<GameObject>();
-                    foreach (var part in steps[i].parts)
+                    foreach (var part in step.parts) 
                     {
                         GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{part.partId}");
                         if (prefab == null)
@@ -77,64 +72,222 @@ namespace LDraw.Runtime
                         GameObject go = Instantiate(prefab, parentContainer);
                         go.transform.localPosition = part.position;
                         go.transform.localRotation = part.rotation;
-                        var renderer = go.GetComponent<Renderer>();
-                        if (renderer != null)
+                        // Submodel or regular part?
+                        if (!models.ContainsKey(part.partId))
                         {
-                            var baseMat = Resources.Load<Material>("DefaultLDrawMaterial");
-                            if (baseMat != null)
+                            // Regular part: ensure it has a renderer, assign material asset if found
+                            var renderer = go.GetComponent<Renderer>();
+                            if (renderer == null)
+                                renderer = go.AddComponent<MeshRenderer>();
+                            string colorKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}";
+                            var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+                            if (mat != null)
                             {
-                                renderer.material = new Material(baseMat);
-                                renderer.material.color = part.color;
+                                renderer.material = mat;
+                            }
+                            else
+                            {
+                                Debug.LogError($"Missing material asset for color {colorKey} on part {part.partId}. Material asset must exist. Skipping material assignment.");
                             }
                         }
+                        go.SetActive(false);
                         objs.Add(go);
                     }
-                    stepObjects.Add(objs);
+                    stepObjs.Add(objs);
                 }
-                foreach (var go in stepObjects[i])
+                modelStepObjects[kvp.Key] = stepObjs;
+            }
+            // Start navigation at main model, step 0
+            navigationStack.Clear();
+            AddNextNavigationStackStep("main.ldr", 0, 0);
+            ShowHierarchicalStep();
+        }
+
+        public void ShowNextStep()
+        {
+            NextHierarchicalStep();
+        }
+
+        public void ShowPreviousStep()
+        {
+            PrevHierarchicalStep();
+        }
+
+        private void ShowHierarchicalStep()
+        {
+            // Hide all objects in all models
+            foreach (var stepObjs in modelStepObjects.Values)
+            {
+                foreach (var objs in stepObjs)
+                {
+                    foreach (var go in objs)
+                    {
+                        if (go != null)
+                            go.SetActive(false);
+                    }
+                }
+            }
+            // Only show the last submodel
+            var stackIdx = navigationStack.Count - 1;
+            var (modelName, stepIdx, doneSubmodel) = navigationStack[stackIdx];
+            var stepList = modelStepObjects[modelName];
+            Debug.Log($"ShowHierarchicalStep {modelName} {stepList.Count} {stepIdx}");
+            for (int i = 0; i <= stepIdx; i++)
+            {
+                foreach (var go in stepList[i])
                 {
                     if (go != null)
                     {
+                        Debug.Log($"SetActive {go.name}");
                         go.SetActive(true);
-                        activeObjects.Add(go);
-                    }
+                    }                        
                 }
-                if (hiddenMeshStack.Count > 0)
+            }
+            // Update navigation text if assigned
+            if (navigationText != null && models != null && models.ContainsKey(modelName))
+            {
+                navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {models[modelName].Count}";
+            }
+        }
+
+        private void AddNextNavigationStackStep(string model, int step, int doneSubmodel)
+        {
+            var nextParts = models[model][step].parts;
+            var nextModels = new List<LDrawPart>();
+            foreach (var p in nextParts)
+                if (models.ContainsKey(p.partId)) nextModels.Add(p);
+            if (nextModels.Count > 0)
+            {
+                if (doneSubmodel < nextModels.Count)
                 {
-                    var toRestore = hiddenMeshStack.Pop();
-                    foreach (var go in toRestore)
+                    navigationStack.Add((model, step, doneSubmodel + 1));
+                    AddNextNavigationStackStep(nextModels[doneSubmodel].partId, 0, 0);
+                }
+                else
+                {
+                    navigationStack.Add((model, step, doneSubmodel));
+                }
+            }
+            else
+            {
+                navigationStack.Add((model, step, 0));
+            }
+        }
+
+        private void NextHierarchicalStep()
+        {
+            if (navigationStack.Count == 0) return;
+            var (currentModel, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
+            var steps = models[currentModel];
+            var step = steps[currentStep];
+            var submodels = new List<LDrawPart>();
+            foreach (var p in step.parts)
+                if (models.ContainsKey(p.partId)) submodels.Add(p);
+            if (doneSubmodel == submodels.Count)
+            {
+                navigationStack.RemoveAt(navigationStack.Count - 1);
+                if (currentStep + 1 < steps.Count)
+                {
+                    AddNextNavigationStackStep(currentModel, currentStep + 1, 0);
+                }
+                else
+                {
+                    if (navigationStack.Count > 0)
                     {
-                        if (go != null)
+                        var (parentModel, parentStep, parentDoneSubmodel) = navigationStack[navigationStack.Count - 1];
+                        var parentStepObj = models[parentModel][parentStep];
+                        var parentSubmodels = new List<LDrawPart>();
+                        foreach (var p in parentStepObj.parts)
+                            if (models.ContainsKey(p.partId)) parentSubmodels.Add(p);
+                        if (parentDoneSubmodel < parentSubmodels.Count)
                         {
-                            go.SetActive(true);
-                            activeObjects.Add(go);
+                            navigationStack.RemoveAt(navigationStack.Count - 1);
+                            AddNextNavigationStackStep(parentModel, parentStep, parentDoneSubmodel);
                         }
                     }
                 }
             }
-            visibleMeshes = activeObjects;
-            currentStepIndex = stepIndex;
+            else
+            {
+                navigationStack.RemoveAt(navigationStack.Count - 1);
+                AddNextNavigationStackStep(currentModel, currentStep, doneSubmodel + 1);
+            }
+            ShowHierarchicalStep();
         }
 
-        private void ClearSpawnedParts()
+        private void AddPrevNavigationStackStep(string model, int step, int doneSubmodel, bool drillin = true)
         {
-            foreach (var go in spawnedParts)
+            var prevModel = models[model];
+            if (step == -1) step = prevModel.Count - 1;
+            var prevParts = prevModel[step].parts;
+            var prevModels = new List<LDrawPart>();
+            foreach (var p in prevParts)
+                if (models.ContainsKey(p.partId)) prevModels.Add(p);
+            if (doneSubmodel == -1) doneSubmodel = prevModels.Count;
+            if (prevModels.Count == 0)
             {
-                if (go != null)
-                    Destroy(go);
+                navigationStack.Add((model, step, doneSubmodel));
             }
-            spawnedParts.Clear();
+            else
+            {
+                navigationStack.Add((model, step, doneSubmodel));
+                if (drillin)
+                {
+                    AddPrevNavigationStackStep(prevModels[doneSubmodel - 1].partId, -1, -1, false);
+                }
+            }
         }
 
-        private void LoadStepsFromJson()
+        private void PrevHierarchicalStep()
         {
-            if (stepDataJson == null)
+            if (navigationStack.Count == 0) return;
+            var (currentModel, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
+            var steps = models[currentModel];
+            var step = steps[currentStep];
+            var submodels = new List<LDrawPart>();
+            foreach (var p in step.parts)
+                if (models.ContainsKey(p.partId)) submodels.Add(p);
+            navigationStack.RemoveAt(navigationStack.Count - 1);
+            if (submodels.Count > 0)
             {
-                Debug.LogError("No step data assigned.");
-                return;
+                if (doneSubmodel == submodels.Count)
+                {
+                    AddPrevNavigationStackStep(currentModel, currentStep, doneSubmodel);
+                }
             }
-
-            steps = JsonUtility.FromJson<LDrawStepListWrapper>(stepDataJson).steps;
+            else
+            {
+                if (currentStep > 0)
+                {
+                    AddPrevNavigationStackStep(currentModel, currentStep - 1, -1, false);
+                }
+                else
+                {
+                    var idx = navigationStack.Count - 1;
+                    while (idx >= 0)
+                    {
+                        var (prevModel, prevStep, prevDoneSubmodel) = navigationStack[idx];
+                        if (prevDoneSubmodel > 1 || prevStep > 0)
+                        {
+                            while (navigationStack.Count > idx)
+                            {
+                                navigationStack.RemoveAt(navigationStack.Count - 1);
+                            }
+                            if (prevDoneSubmodel > 1)
+                            {
+                                AddPrevNavigationStackStep(prevModel, prevStep, prevDoneSubmodel - 1);
+                            }
+                            else
+                            {
+                                AddPrevNavigationStackStep(prevModel, prevStep - 1, -1, false);
+                            }
+                            break;
+                        }
+                        idx--;
+                    }
+                }
+            }
+            ShowHierarchicalStep();
         }
     }
 }

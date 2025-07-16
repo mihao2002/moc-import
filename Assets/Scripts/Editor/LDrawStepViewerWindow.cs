@@ -140,8 +140,8 @@ namespace LDraw.Editor
             LDrawPartLoader.ClearCache();
 
             models = LDrawParser.ParseModels(ldrawFilePath);
-            // Save step data to JSON for LDrawStepNavigator
-            // LDrawParser.SaveStepsToJsonAsset(flatSteps.ConvertAll(fs => fs.step), "Assets/Resources/LDrawStepData.json");
+
+            LDrawParser.SaveModelsToJsonAsset(models);
             modelStepObjects.Clear();
             foreach (var kvp in models)
             {

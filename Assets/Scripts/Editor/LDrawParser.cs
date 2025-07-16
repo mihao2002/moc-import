@@ -252,12 +252,17 @@ namespace LDraw.Editor
             visited.Remove(modelName);
         }
 
-        public static void SaveStepsToJsonAsset(List<LDrawStep> steps, string outputPath = "Assets/Resources/LDrawStepData.json")
+        public static void SaveModelsToJsonAsset(Dictionary<string, List<LDrawStep>> models, string outputPath = "Assets/Resources/LDrawStepData.json")
         {
-            var wrapper = new LDrawStepListWrapper { steps = steps };
+            var list = new List<LDraw.Runtime.ModelStepPair>();
+            foreach (var kvp in models)
+            {
+                list.Add(new LDraw.Runtime.ModelStepPair { modelName = kvp.Key, steps = kvp.Value });
+            }
+            var wrapper = new LDraw.Runtime.LDrawModelStepData { models = list };
             string json = JsonUtility.ToJson(wrapper, true);
             File.WriteAllText(outputPath, json);
-            Debug.Log($"Saved step data to {outputPath}");
+            Debug.Log($"Saved model step data to {outputPath}");
             AssetDatabase.Refresh();
         }
     }
