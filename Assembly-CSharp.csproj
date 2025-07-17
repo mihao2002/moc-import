@@ -60,7 +60,11 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.1.7f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\StaticLDCadCamera.cs" />
+    <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\Consts.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepHierarchyNavigator.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\ModelContainer.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawModelStepData.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\OrbitCamera.cs" />
     <Compile Include="Assets\Scripts\DrawFaceNormals.cs" />

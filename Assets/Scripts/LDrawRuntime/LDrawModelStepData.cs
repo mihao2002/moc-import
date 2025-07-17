@@ -10,6 +10,9 @@ namespace LDraw.Runtime
     public class LDrawStep
     {
         public List<LDrawPart> parts = new List<LDrawPart>();
+        
+        // Rotation support for submodels
+        public Vector3? rotation; // null = no rotation, Vector3.zero = ROTSTEP END, other values = rotation angles
     }
 
     [Serializable]

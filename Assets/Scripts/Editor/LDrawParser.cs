@@ -112,15 +112,48 @@ namespace LDraw.Editor
         {
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
+            
             for (int i = start; i < end; i++)
             {
                 var line = lines[i];
-                if (line.Trim().ToLower() == "0 step")
+                if (line.StartsWith("0 "))
                 {
-                    if (currentStep.parts.Count > 0)
+                    var tokens = line.Trim().Split(' ');
+                    if (tokens.Length > 1)
                     {
-                        steps.Add(currentStep);
-                        currentStep = new LDrawStep();
+                        var directive = tokens[1].ToUpper();
+                        
+                        // Handle ROTSTEP rotation data first (for current step)
+                        if (directive == "ROTSTEP" && tokens.Length >= 6)
+                        {                        
+                            var type = tokens[5].ToUpper();
+                            if (type == "END")
+                            {
+                                currentStep.rotation = Vector3.zero; // ROTSTEP END
+                            }
+                            else if (type == "ABS")
+                            {
+                                currentStep.rotation = new Vector3(
+                                    float.Parse(tokens[2]),
+                                    float.Parse(tokens[3]),
+                                    float.Parse(tokens[4])
+                                );
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"ROTSTEP with unsupported type: {type}. Line: {line}");
+                            }
+                        }
+                        
+                        // Handle step boundaries (create new step after processing rotation)
+                        if (directive == "STEP" || directive == "ROTSTEP")
+                        {
+                            if (currentStep.parts.Count > 0)
+                            {
+                                steps.Add(currentStep);
+                                currentStep = new LDrawStep();
+                            }
+                        }
                     }
                 }
                 else if (line.StartsWith("1 "))
@@ -141,7 +174,7 @@ namespace LDraw.Editor
                         mLDraw.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
                         mLDraw.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
                         mLDraw.SetColumn(3, new Vector4(0, 0, 0, 1));
-                        Matrix4x4 RL = LDrawPartLoader.negateZ * mLDraw * LDrawPartLoader.negateZ;
+                        Matrix4x4 RL = Consts.NegateZ * mLDraw * Consts.NegateZ;
                         part.rotation = RL.rotation;
                         int colorCode = int.Parse(tokens[1]);
                         part.color = LDrawColorManager.GetColor(colorCode);

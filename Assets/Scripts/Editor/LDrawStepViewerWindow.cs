@@ -100,8 +100,12 @@ namespace LDraw.Editor
                 var (currentModel, currentStep) = navigator.GetCurrentStep();
                 if (currentModel != null && currentStep >= 0)
                 {
+                    var modelContainers = navigator.GetType().GetField("modelContainers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, ModelContainer>;
+                    int totalSteps = 0;
+                    if (modelContainers != null && modelContainers.ContainsKey(currentModel))
+                        totalSteps = modelContainers[currentModel].GetStepCount();
                     EditorGUILayout.Space();
-                    EditorGUILayout.LabelField($"Model: {currentModel} | Step: {currentStep + 1}");
+                    EditorGUILayout.LabelField($"Model: {currentModel} | Step: {currentStep + 1} / {totalSteps}");
                     EditorGUILayout.BeginHorizontal();
 
                     EditorGUI.BeginDisabledGroup(navigator.IsAtStart);
@@ -146,27 +150,24 @@ namespace LDraw.Editor
             navigator = new LDrawStepHierarchyNavigator(models);
             
             // Editor-specific: instantiate parts using LDrawPartLoader
-            var modelStepObjects = new Dictionary<string, List<List<GameObject>>>();
+            var modelContainers = new Dictionary<string, ModelContainer>();
             foreach (var kvp in models)
             {
-                var stepObjs = new List<List<GameObject>>();
+                var modelContainer = new ModelContainer(kvp.Key);
                 foreach (var step in kvp.Value)
                 {
                     var objs = new List<GameObject>();
                     foreach (var part in step.parts)
                     {
                         GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
-                        go.SetActive(false);
                         objs.Add(go);
                     }
-                    stepObjs.Add(objs);
+                    modelContainer.AddStep(objs);
                 }
-                modelStepObjects[kvp.Key] = stepObjs;
+                modelContainers[kvp.Key] = modelContainer;
             }
-            
-            // Set the modelStepObjects in the navigator
-            navigator.SetModelStepObjects(modelStepObjects);
-            
+            // Set the modelContainers in the navigator
+            navigator.SetModelContainers(modelContainers);
             // Initialize navigation
             navigator.InitializeNavigation();
         }

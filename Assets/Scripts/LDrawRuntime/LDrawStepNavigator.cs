@@ -28,8 +28,8 @@ namespace LDraw.Runtime
                 return;
             }
             navigator = new LDrawStepHierarchyNavigator(models);
+            navigator.InitializeNavigation(); // Initialize navigation first
             PreInstantiateAllParts(); // Runtime-specific: instantiate from prefabs
-            navigator.InitializeNavigation(); // Initialize navigation after instantiation
             UpdateNavigationText();
         }
 
@@ -52,8 +52,12 @@ namespace LDraw.Runtime
                 var (modelName, stepIdx) = navigator.GetCurrentStep();
                 if (modelName != null && stepIdx >= 0)
                 {
-                    var models = navigator.GetType().GetField("models", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, List<LDrawStep>>;
-                    navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {models[modelName].Count}";
+                    var modelContainers = navigator.GetType().GetField("modelContainers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, ModelContainer>;
+                    if (modelContainers != null && modelContainers.ContainsKey(modelName))
+                    {
+                        var container = modelContainers[modelName];
+                        navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {container.GetStepCount()}";
+                    }
                 }
             }
         }
@@ -62,11 +66,11 @@ namespace LDraw.Runtime
         private void PreInstantiateAllParts()
         {
             var models = navigator.GetType().GetField("models", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, List<LDrawStep>>;
-            var modelStepObjects = new Dictionary<string, List<List<GameObject>>>();
+            var modelContainers = new Dictionary<string, ModelContainer>();
             
             foreach (var kvp in models)
             {
-                var stepObjs = new List<List<GameObject>>();
+                var modelContainer = new ModelContainer(kvp.Key);
                 foreach (var step in kvp.Value)
                 {
                     var objs = new List<GameObject>();
@@ -98,16 +102,14 @@ namespace LDraw.Runtime
                                 Debug.LogError($"Missing material asset for color {colorKey} on part {part.partId}. Material asset must exist. Skipping material assignment.");
                             }
                         }
-                        go.SetActive(false);
                         objs.Add(go);
                     }
-                    stepObjs.Add(objs);
+                    modelContainer.AddStep(objs);
                 }
-                modelStepObjects[kvp.Key] = stepObjs;
+                modelContainers[kvp.Key] = modelContainer;
             }
-            
-            // Set the modelStepObjects in the navigator
-            navigator.SetModelStepObjects(modelStepObjects);
+            // Set the modelContainers in the navigator
+            navigator.SetModelContainers(modelContainers);
         }
     }
 }

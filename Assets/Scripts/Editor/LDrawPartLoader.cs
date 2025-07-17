@@ -16,20 +16,6 @@ namespace LDraw.Editor
 
     public static class LDrawPartLoader
     {
-        public static readonly Matrix4x4 swapYZ1 = new Matrix4x4(
-            new Vector4(1, 0, 0, 0),   // X stays X
-            new Vector4(0, 0, 1, 0),   // Y becomes Z
-            new Vector4(0, 1, 0, 0),   // Z becomes Y
-            new Vector4(0, 0, 0, 1)    // Homogeneous coordinate
-        );
-
-        public static readonly Matrix4x4 negateZ = new Matrix4x4(
-            new Vector4(1, 0, 0, 0),   // X stays X
-            new Vector4(0, 1, 0, 0),   // Y becomes Z
-            new Vector4(0, 0, -1, 0),   // Z becomes Y
-            new Vector4(0, 0, 0, 1)    // Homogeneous coordinate
-        );    
-
         private static Dictionary<string, LDrawMesh> meshCache = new Dictionary<string, LDrawMesh>();
         private static HashSet<string> loadingParts = new HashSet<string>();
 
@@ -452,7 +438,7 @@ namespace LDraw.Editor
                                 transform.SetColumn(3, new Vector4(tx, ty, tz, 1));
 
                                 bool isMirrored = MatrixIsMirrored(transform);
-                                transform = negateZ * transform * negateZ;
+                                transform = Consts.NegateZ * transform * Consts.NegateZ;
 
                                 LDrawMesh ldrawMesh = LoadMeshFromLibrary(referencedPartId, partLibraryPath, unofficialPartLibraryPath, models, false);
                                 if (ldrawMesh != null)

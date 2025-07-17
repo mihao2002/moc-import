@@ -8,25 +8,29 @@ namespace LDraw.Runtime
     {
         private Dictionary<string, List<LDrawStep>> models;
         private List<(string modelName, int stepIndex, int doneSubmodel)> navigationStack = new List<(string, int, int)>();
-        private Dictionary<string, List<List<GameObject>>> modelStepObjects = new Dictionary<string, List<List<GameObject>>>();
-
+        private Dictionary<string, ModelContainer> modelContainers = new Dictionary<string, ModelContainer>();
+        
+        // Rotation tracking for submodels
+        private Dictionary<string, Vector3> submodelRotations = new Dictionary<string, Vector3>();
+        
         public LDrawStepHierarchyNavigator(Dictionary<string, List<LDrawStep>> models)
         {
             this.models = models;
         }
 
-        // Call this method after setting up modelStepObjects with your own instantiation logic
+        // Call this method after setting up modelContainers with your own instantiation logic
         public void InitializeNavigation()
         {
             navigationStack.Clear();
+            submodelRotations.Clear();
             AddNextNavigationStackStep("main.ldr", 0, 0);
             ShowHierarchicalStep();
         }
 
-        // Editor-specific method to set up modelStepObjects from editor-instantiated GameObjects
-        public void SetModelStepObjects(Dictionary<string, List<List<GameObject>>> modelStepObjects)
+        // Method to set up modelContainers from instantiated ModelContainer objects (both editor and runtime)
+        public void SetModelContainers(Dictionary<string, ModelContainer> modelContainers)
         {
-            this.modelStepObjects = modelStepObjects;
+            this.modelContainers = modelContainers;
         }
 
         public void ShowNextStep()
@@ -88,33 +92,53 @@ namespace LDraw.Runtime
 
         private void ShowHierarchicalStep()
         {
-            // Hide all objects in all models
-            foreach (var stepObjs in modelStepObjects.Values)
+            // Hide all models
+            foreach (var container in modelContainers.Values)
             {
-                foreach (var objs in stepObjs)
-                {
-                    foreach (var go in objs)
-                    {
-                        if (go != null)
-                            go.SetActive(false);
-                    }
-                }
+                container.Show(false);
             }
-            // Only show the last submodel
+
+            // Show the current model
             var stackIdx = navigationStack.Count - 1;
             var (modelName, stepIdx, doneSubmodel) = navigationStack[stackIdx];
-            var stepList = modelStepObjects[modelName];
-            Debug.Log($"ShowHierarchicalStep {modelName} {stepList.Count} {stepIdx}");
+            if (!modelContainers.ContainsKey(modelName)) return;
+            var modelContainer = modelContainers[modelName];
+            modelContainer.Show(true);
+
+            var modelSteps = models[modelName];
+            Debug.Log($"ShowHierarchicalStep {modelName} {modelSteps.Count} {stepIdx}");
+
+            // Apply rotation for current step if it has rotation
+            if (stepIdx < modelSteps.Count && modelSteps[stepIdx].rotation.HasValue)
+            {
+                var step = modelSteps[stepIdx];
+                Vector3 rotationValue = step.rotation.Value;
+
+                if (rotationValue == Vector3.zero)
+                {
+                    // Reset rotation to (0,0,0)
+                    submodelRotations[modelName] = Vector3.zero;
+                    modelContainer.Rotate(0, 0, 0);
+                    Debug.Log($"Reset rotation for {modelName} to (0,0,0)");
+                }
+                else
+                {
+                    // Apply rotation
+                    submodelRotations[modelName] = rotationValue;
+                    modelContainer.Rotate(rotationValue.x, rotationValue.y, rotationValue.z);
+                    Debug.Log($"Applied rotation to {modelName}: {rotationValue}");
+                }
+            }
+
+            // Show steps up to and including stepIdx
             for (int i = 0; i <= stepIdx; i++)
             {
-                foreach (var go in stepList[i])
-                {
-                    if (go != null)
-                    {
-                        Debug.Log($"SetActive {go.name}");
-                        go.SetActive(true);
-                    }                        
-                }
+                modelContainer.ShowStep(i, true);
+            }
+            // Hide steps after stepIdx
+            for (int i = stepIdx + 1; i < modelSteps.Count; i++)
+            {
+                modelContainer.ShowStep(i, false);
             }
         }
 
