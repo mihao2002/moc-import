@@ -9,10 +9,7 @@ namespace LDraw.Runtime
         private Dictionary<string, List<LDrawStep>> models;
         private List<(string modelName, int stepIndex, int doneSubmodel)> navigationStack = new List<(string, int, int)>();
         private Dictionary<string, ModelContainer> modelContainers = new Dictionary<string, ModelContainer>();
-        
-        // Rotation tracking for submodels
-        private Dictionary<string, Vector3> submodelRotations = new Dictionary<string, Vector3>();
-        
+       
         public LDrawStepHierarchyNavigator(Dictionary<string, List<LDrawStep>> models)
         {
             this.models = models;
@@ -22,7 +19,6 @@ namespace LDraw.Runtime
         public void InitializeNavigation()
         {
             navigationStack.Clear();
-            submodelRotations.Clear();
             AddNextNavigationStackStep("main.ldr", 0, 0);
             ShowHierarchicalStep();
         }
@@ -106,7 +102,7 @@ namespace LDraw.Runtime
             modelContainer.Show(true);
 
             var modelSteps = models[modelName];
-            Debug.Log($"ShowHierarchicalStep {modelName} {modelSteps.Count} {stepIdx}");
+            Debug.Log($"ShowHierarchicalStep {modelName} {modelSteps.Count} {stepIdx} {modelSteps[stepIdx].rotation.HasValue}");
 
             // Apply rotation for current step if it has rotation
             if (stepIdx < modelSteps.Count && modelSteps[stepIdx].rotation.HasValue)
@@ -117,14 +113,12 @@ namespace LDraw.Runtime
                 if (rotationValue == Vector3.zero)
                 {
                     // Reset rotation to (0,0,0)
-                    submodelRotations[modelName] = Vector3.zero;
                     modelContainer.Rotate(0, 0, 0);
                     Debug.Log($"Reset rotation for {modelName} to (0,0,0)");
                 }
                 else
                 {
                     // Apply rotation
-                    submodelRotations[modelName] = rotationValue;
                     modelContainer.Rotate(rotationValue.x, rotationValue.y, rotationValue.z);
                     Debug.Log($"Applied rotation to {modelName}: {rotationValue}");
                 }

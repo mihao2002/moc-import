@@ -44,9 +44,8 @@ namespace LDraw.Runtime
 
         public void Rotate(float x, float y, float z)
         {
-            Matrix4x4 rotation = Matrix4x4.Rotate(Quaternion.Euler(x, y, z));
-            Matrix4x4 lhcs = Consts.NegateZ * rotation * Consts.NegateZ;
-            modelContainer.transform.localRotation = lhcs.rotation;
+            Quaternion rotation = Quaternion.Euler(x, -y, -z);
+            modelContainer.transform.localRotation = rotation;
         }
 
         public int GetStepCount()

@@ -150,6 +150,12 @@ namespace LDraw.Editor
                         {
                             if (currentStep.parts.Count > 0)
                             {
+                                // make sure the first step needs to have a rotation
+                                if (steps.Count == 0 && currentStep.rotation == null)
+                                {
+                                    currentStep.rotation = Vector3.zero;
+                                }
+                                    
                                 steps.Add(currentStep);
                                 currentStep = new LDrawStep();
                             }
@@ -182,8 +188,18 @@ namespace LDraw.Editor
                     }
                 }
             }
+
             if (currentStep.parts.Count > 0)
+            {
+                // make sure the first step needs to have a rotation
+                if (steps.Count == 0 && currentStep.rotation == null)
+                {
+                    currentStep.rotation = Vector3.zero;
+                }
+                    
                 steps.Add(currentStep);
+            }
+                
             return steps;
         }
 
