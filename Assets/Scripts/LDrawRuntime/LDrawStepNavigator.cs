@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using Newtonsoft.Json;
 
 namespace LDraw.Runtime
 {
@@ -8,6 +9,7 @@ namespace LDraw.Runtime
     {
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
+        public Camera mainCamera; // Assign in inspector
 
         private LDrawStepHierarchyNavigator navigator;
 
@@ -20,14 +22,16 @@ namespace LDraw.Runtime
                 Debug.LogError("LDrawStepData.json not found in Resources!");
                 return;
             }
-            var wrapper = JsonUtility.FromJson<LDrawModelStepData>(jsonAsset.text);
+            // var wrapper = JsonUtility.FromJson<LDrawModelStepData>(jsonAsset.text);
+            var wrapper = JsonConvert.DeserializeObject<LDrawModelStepData>(jsonAsset.text);
+
             var models = wrapper.ToDictionary();
             if (models == null || models.Count == 0)
             {
                 Debug.LogError("No models found in LDrawStepData.json!");
                 return;
             }
-            navigator = new LDrawStepHierarchyNavigator(models);
+            navigator = new LDrawStepHierarchyNavigator(models, mainCamera != null ? mainCamera : Camera.main);
             navigator.InitializeNavigation(); // Initialize navigation first
             PreInstantiateAllParts(); // Runtime-specific: instantiate from prefabs
             UpdateNavigationText();

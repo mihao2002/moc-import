@@ -13,6 +13,8 @@ namespace LDraw.Runtime
         
         // Rotation support for submodels
         public Vector3? rotation; // null = no rotation, Vector3.zero = ROTSTEP END, other values = rotation angles
+        public float radius; // always set by editor
+        public Vector3 center; // the center of the game object
     }
 
     [Serializable]

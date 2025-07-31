@@ -5,68 +5,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using LDraw.Runtime;
+using Newtonsoft.Json;
 
 namespace LDraw.Editor
 {
     public static class LDrawParser
     {
         public static string mainModelName = "main.ldr";
-        public static List<LDrawStep> Parse(string filePath)
-        {
-            var lines = File.ReadAllLines(filePath);
-            var models = new Dictionary<string, List<LDrawStep>>();
-            var modelOrder = new List<string>();
-            string currentModel = mainModelName;
-            int modelStart = 0;
-            var fileSections = new List<(string name, int start, int end)>();
-
-            // 1. Identify model sections (by 0 FILE ...)
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-                if (line.TrimStart().StartsWith("0 FILE ", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Save previous section
-                    if (i > modelStart)
-                    {
-                        fileSections.Add((currentModel, modelStart, i));
-                    }
-                    currentModel = line.Trim().Substring(7).Trim().ToLower();
-                    modelOrder.Add(currentModel);
-                    modelStart = i + 1;
-                }
-            }
-            // Add last section
-            if (modelStart < lines.Length)
-                fileSections.Add((currentModel, modelStart, lines.Length));
-
-            // 2. Parse each model section into steps
-            if (fileSections.Count == 0)
-            {
-                // No 0 FILE, treat as single model
-                models[mainModelName] = ParseStepsFromLines(lines, 0, lines.Length);
-                modelOrder.Add(mainModelName);
-            }
-            else
-            {
-                foreach (var (name, start, end) in fileSections)
-                {
-                    models[name] = ParseStepsFromLines(lines, start, end);
-                }
-            }
-
-            // 3. Recursively expand steps for the main model
-            string mainModel = modelOrder.Count > 0 ? modelOrder[0] : mainModelName;
-            var expandedSteps = ExpandModelSteps(mainModel, models, new HashSet<string>());
-            return expandedSteps;
-        }
 
         // New: Parse all models and their steps, without recursive expansion
         public static Dictionary<string, List<LDrawStep>> ParseModels(string filePath)
         {
             var lines = File.ReadAllLines(filePath);
             var models = new Dictionary<string, List<LDrawStep>>();
-            var modelOrder = new List<string>();
+            var modelNames = new HashSet<string>();
             string currentModel = mainModelName;
             int modelStart = 0;
             var fileSections = new List<(string name, int start, int end)>();
@@ -81,38 +33,38 @@ namespace LDraw.Editor
                     if (i > modelStart)
                     {
                         fileSections.Add((currentModel, modelStart, i));
+                        modelNames.Add(currentModel);
                     }
                     currentModel = line.Trim().Substring(7).Trim().ToLower();
-                    modelOrder.Add(currentModel);
-                    modelStart = i + 1;
+                    modelStart = i;
                 }
             }
-            // Add last section
-            if (modelStart < lines.Length)
-                fileSections.Add((currentModel, modelStart, lines.Length));
 
-            // Parse each model section into steps
-            if (fileSections.Count == 0)
+            // Add last section
+            fileSections.Add((currentModel, modelStart, lines.Length));
+            modelNames.Add(currentModel);
+
+            foreach (var (name, start, end) in fileSections)
             {
-                // No 0 FILE, treat as single model
-                models[mainModelName] = ParseStepsFromLines(lines, 0, lines.Length);
+                models[name] = ParseStepsFromLines(lines, start, end, modelNames);
             }
-            else
-            {
-                foreach (var (name, start, end) in fileSections)
-                {
-                    models[name] = ParseStepsFromLines(lines, start, end);
-                }
-            }
+
             return models;
         }
 
         // Helper: Parse a range of lines into steps
-        private static List<LDrawStep> ParseStepsFromLines(string[] lines, int start, int end)
+        private static List<LDrawStep> ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
         {
+            // Quaternion defaultQuaternion = (Quaternion.AngleAxis(30f, Vector3.right) * 
+            //     Quaternion.AngleAxis(45f, Vector3.up) * 
+            //     Quaternion.LookRotation(Vector3.back, Vector3.down));
+            // Quaternion defaultQuaternion = Quaternion.Euler(30f, 45f, 0f);
+            Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
+
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
-            
+            var hasModelInStep = false;
+            var currentRotation = defaultRotation;
             for (int i = start; i < end; i++)
             {
                 var line = lines[i];
@@ -122,43 +74,41 @@ namespace LDraw.Editor
                     if (tokens.Length > 1)
                     {
                         var directive = tokens[1].ToUpper();
-                        
-                        // Handle ROTSTEP rotation data first (for current step)
-                        if (directive == "ROTSTEP" && tokens.Length >= 6)
-                        {                        
-                            var type = tokens[5].ToUpper();
-                            if (type == "END")
-                            {
-                                currentStep.rotation = Vector3.zero; // ROTSTEP END
-                            }
-                            else if (type == "ABS")
-                            {
-                                currentStep.rotation = new Vector3(
-                                    float.Parse(tokens[2]),
-                                    float.Parse(tokens[3]),
-                                    float.Parse(tokens[4])
-                                );
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"ROTSTEP with unsupported type: {type}. Line: {line}");
-                            }
-                        }
-                        
+                      
                         // Handle step boundaries (create new step after processing rotation)
-                        if (directive == "STEP" || directive == "ROTSTEP")
+                        if ((directive == "STEP" || directive == "ROTSTEP") && currentStep.parts.Count > 0)
                         {
-                            if (currentStep.parts.Count > 0)
-                            {
-                                // make sure the first step needs to have a rotation
-                                if (steps.Count == 0 && currentStep.rotation == null)
+                            // Handle ROTSTEP rotation data first (for current step)
+                            if (directive == "ROTSTEP" && tokens.Length >= 6)
+                            {                        
+                                var type = tokens[5].ToUpper();
+                                if (type == "END")
                                 {
-                                    currentStep.rotation = Vector3.zero;
+                                    currentRotation = defaultRotation;
+                                    currentStep.rotation = defaultRotation; // Vector3.zero; // ROTSTEP END
                                 }
-                                    
-                                steps.Add(currentStep);
-                                currentStep = new LDrawStep();
+                                else if (type == "ABS")
+                                {
+                                    currentRotation = new Vector3(
+                                        float.Parse(tokens[2]),
+                                        float.Parse(tokens[3]),
+                                        float.Parse(tokens[4]));
+                                    currentStep.rotation = currentRotation;
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"ROTSTEP with unsupported type: {type}. Line: {line}");
+                                }
                             }
+                            // For normal STEP, add rotation if it is the first step or there is model in the step
+                            else if ((steps.Count == 0 || hasModelInStep) && currentStep.rotation == null)
+                            {
+                                currentStep.rotation = currentRotation;
+                            }
+
+                            steps.Add(currentStep);
+                            currentStep = new LDrawStep();
+                            hasModelInStep = false;
                         }
                     }
                 }
@@ -169,11 +119,12 @@ namespace LDraw.Editor
                     {
                         var part = new LDrawPart();
                         part.partId = tokens[14].ToLower();
+                        hasModelInStep |= modelNames.Contains(part.partId);
                         Vector3 posLDraw = new Vector3(
-                            float.Parse(tokens[2]),
-                            float.Parse(tokens[3]),
-                            float.Parse(tokens[4])
-                        ) * 0.01f;
+                                float.Parse(tokens[2]),
+                                float.Parse(tokens[3]),
+                                float.Parse(tokens[4])
+                            ) * 0.01f;
                         part.position = new Vector3(posLDraw.x, posLDraw.y, -posLDraw.z);
                         Matrix4x4 mLDraw = new Matrix4x4();
                         mLDraw.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
@@ -191,114 +142,21 @@ namespace LDraw.Editor
 
             if (currentStep.parts.Count > 0)
             {
-                // make sure the first step needs to have a rotation
-                if (steps.Count == 0 && currentStep.rotation == null)
-                {
-                    currentStep.rotation = Vector3.zero;
-                }
-                    
+                // Always has rotation for the last step
+                currentStep.rotation = currentRotation;
                 steps.Add(currentStep);
+            }
+            else
+            {
+                var lastStep = steps.Count - 1;
+                // Ensure the last step has rotation
+                if (lastStep >= 0 && steps[lastStep].rotation == null)
+                {
+                    steps[lastStep].rotation = currentRotation;
+                }
             }
                 
             return steps;
-        }
-
-        // Recursively expand steps for a model, inlining submodel steps and adding a step for the assembled submodel
-        private static List<LDrawStep> ExpandModelSteps(string modelName, Dictionary<string, List<LDrawStep>> models, HashSet<string> callStack)
-        {
-            if (!models.ContainsKey(modelName))
-                return new List<LDrawStep>();
-            var result = new List<LDrawStep>();
-            var modelSteps = models[modelName];
-
-            foreach (var step in modelSteps)
-            {
-                var newStep = new LDrawStep();
-                foreach (var part in step.parts)
-                {
-                    if (models.ContainsKey(part.partId) && !callStack.Contains(part.partId))
-                    {
-                        // Entering submodel: expand recursively
-                        callStack.Add(part.partId);
-                        var subSteps = ExpandModelSteps(part.partId, models, callStack);
-                        callStack.Remove(part.partId);
-                        result.AddRange(subSteps);
-                        // Set showAllPrevious on the step that adds the assembled submodel if needed
-                        if (subSteps.Count > 0)
-                        {
-                            var showStep = new LDrawStep();
-                            showStep.parts.Add(part); // Add the assembled submodel as a part
-                            result.Add(showStep);
-                        }
-                        else
-                        {
-                            // If no context, just add the submodel as a part
-                            var submodelStep = new LDrawStep();
-                            submodelStep.parts.Add(part);
-                            result.Add(submodelStep);
-                        }
-                    }
-                    else
-                    {
-                        newStep.parts.Add(part);
-                    }
-                }
-                if (newStep.parts.Count > 0)
-                {
-                    result.Add(newStep);
-                }
-            }
-            return result;
-        }
-
-        // Flatten all steps into a single sequence, with context tracking
-        public class FlatStep
-        {
-            public LDrawStep step;
-            public string modelName;
-            public int stepIndexInModel;
-            public string parentModel;
-            public int? parentStepIndex;
-        }
-
-        public static List<FlatStep> FlattenSteps(Dictionary<string, List<LDrawStep>> models)
-        {
-            var flatSteps = new List<FlatStep>();
-            var visited = new HashSet<string>();
-            Debug.Log($"Flattening steps for {models.Count} models, {string.Join(", ", models.Keys)}");
-            FlattenModelStepsRecursive(mainModelName, models, flatSteps, null, null, visited);
-            return flatSteps;
-        }
-
-        private static void FlattenModelStepsRecursive(string modelName, Dictionary<string, List<LDrawStep>> models, List<FlatStep> flatSteps, string parentModel, int? parentStepIndex, HashSet<string> visited)
-        {
-            if (!models.ContainsKey(modelName) || visited.Contains(modelName))
-                return;
-            visited.Add(modelName);
-            var steps = models[modelName];
-            for (int i = 0; i < steps.Count; i++)
-            {
-                var step = steps[i];
-                // First, flatten submodels referenced in this step
-                foreach (var part in step.parts)
-                {
-                    if (models.ContainsKey(part.partId))
-                    {
-                        FlattenModelStepsRecursive(part.partId, models, flatSteps, modelName, i, visited);
-                    }
-                }
-                // Then, add the parent step
-                flatSteps.Add(new FlatStep
-                {
-                    step = step,
-                    modelName = modelName,
-                    stepIndexInModel = i,
-                    parentModel = parentModel,
-                    parentStepIndex = parentStepIndex
-                });
-                Debug.Log($"Added flat step {flatSteps.Count - 1} for model {modelName} step {i}");
-            }
-            visited.Remove(modelName);
         }
 
         public static void SaveModelsToJsonAsset(Dictionary<string, List<LDrawStep>> models, string outputPath = "Assets/Resources/LDrawStepData.json")
@@ -309,7 +167,19 @@ namespace LDraw.Editor
                 list.Add(new LDraw.Runtime.ModelStepPair { modelName = kvp.Key, steps = kvp.Value });
             }
             var wrapper = new LDraw.Runtime.LDrawModelStepData { models = list };
-            string json = JsonUtility.ToJson(wrapper, true);
+            //string json = JsonUtility.ToJson(wrapper, true);
+
+            var settings = new JsonSerializerSettings()
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            settings.Converters.Add(new Vector3Converter());
+            settings.Converters.Add(new QuaternionConverter());
+            settings.Converters.Add(new ColorConverter());
+            settings.Converters.Add(new NullableVector3Converter());       
+                     
+
+            string json = JsonConvert.SerializeObject(wrapper, Formatting.Indented, settings);
             File.WriteAllText(outputPath, json);
             Debug.Log($"Saved model step data to {outputPath}");
             AssetDatabase.Refresh();

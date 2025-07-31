@@ -63,11 +63,13 @@
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\Consts.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepHierarchyNavigator.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\LDrawCamera.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\ModelContainer.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawModelStepData.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\OrbitCamera.cs" />
     <Compile Include="Assets\Scripts\DrawFaceNormals.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepNavigator.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\JsonConverters.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
@@ -573,6 +575,10 @@
     </Reference>
     <Reference Include="Unity.VisualScripting.Antlr3.Runtime">
       <HintPath>Library\PackageCache\com.unity.visualscripting@6279e2b7c485\Runtime\VisualScripting.Flow\Dependencies\NCalc\Unity.VisualScripting.Antlr3.Runtime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@74deb55db2a0\Runtime\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Mono.Cecil">
