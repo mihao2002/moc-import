@@ -161,6 +161,70 @@ namespace LDraw.Editor
             return null;
         }
 
+        private static Mesh CombineMeshesPreserveSubmeshes(List<CombineInstance> combineInstances)
+        {
+            List<Vector3> allVertices = new List<Vector3>();
+            List<Vector3> allNormals = new List<Vector3>();
+            List<Vector2> allUVs = new List<Vector2>();
+            List<int> allTriangles = new List<int>();
+
+            int vertexOffset = 0;
+
+            foreach (var ci in combineInstances)
+            {
+                Mesh mesh = ci.mesh;
+                Matrix4x4 transform = ci.transform;
+
+                var vertices = mesh.vertices;
+                var normals = mesh.normals;
+                var uvs = mesh.uv;
+
+                // Transform and append vertices and normals
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    allVertices.Add(transform.MultiplyPoint3x4(vertices[i]));
+                    if (i < normals.Length)
+                        allNormals.Add(transform.MultiplyVector(normals[i]));
+                }
+
+                // Append UVs (if available)
+                if (uvs != null && uvs.Length == vertices.Length)
+                {
+                    allUVs.AddRange(uvs);
+                }
+
+                // Collect triangles from all submeshes and offset indices
+                for (int sub = 0; sub < mesh.subMeshCount; sub++)
+                {
+                    int[] tris = mesh.GetTriangles(sub);
+                    for (int i = 0; i < tris.Length; i++)
+                    {
+                        allTriangles.Add(tris[i] + vertexOffset);
+                    }
+                }
+
+                vertexOffset += vertices.Length;
+            }
+
+            // Build the combined mesh
+            Mesh combined = new Mesh();
+            combined.name = "CombinedMesh";
+            combined.SetVertices(allVertices);
+
+            if (allNormals.Count == allVertices.Count)
+                combined.SetNormals(allNormals);
+
+            if (allUVs.Count == allVertices.Count)
+                combined.SetUVs(0, allUVs);
+
+            combined.subMeshCount = 1;
+            combined.SetTriangles(allTriangles, 0);
+
+            combined.RecalculateBounds();
+            return combined;
+        }
+
+
         // Overload: allow passing in-memory models for submodel mesh generation, and indicate if this is a top-level part
         public static LDrawMesh LoadMeshFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models, bool isTopLevel = false)
         {
@@ -198,6 +262,11 @@ namespace LDraw.Editor
 
                             for (int i = 0; i < verts.Length; i++)
                             {
+                                if (i == 0)
+                                {
+                                    Debug.Log($"The model is {partId}, The first vertice of {part.partId} is at {part.position}, lenth {verts.Length}");
+                                }
+
                                 verts[i] = part.rotation * verts[i] + part.position;  // Transform vertex position
                                 norms[i] = part.rotation * norms[i];                   // Rotate normal direction only
                             }
@@ -257,11 +326,16 @@ namespace LDraw.Editor
                 var subMeshList = new List<CombineInstance>();
                 var materialList = new List<Material>();
 
+                Debug.Log($"Creating prefab for {partId}");
                 foreach (var kvp in colorToInstances)
-                {
+                {                    
                     var matOrColor = kvp.Key;
-                    var groupMesh = new Mesh();
-                    groupMesh.CombineMeshes(kvp.Value.ToArray(), false, false); // merge into one mesh
+                    Debug.Log($"Creating prefab for {partId} - color {matOrColor}, count {kvp.Value.ToArray().Length}");
+                    var groupMesh = CombineMeshesPreserveSubmeshes(kvp.Value);
+                    // Mesh groupMesh = new Mesh();
+                    // groupMesh.CombineMeshes(kvp.Value.ToArray(), false, false); // merge into one mesh
+                    
+                    Debug.Log($"The model is {partId}, the total vertices is {groupMesh.vertices.Length} for color {matOrColor}");
                     subMeshList.Add(new CombineInstance
                     {
                         mesh = groupMesh,
@@ -275,8 +349,14 @@ namespace LDraw.Editor
                 }
 
                 // Final combined mesh with multiple submeshes (1 per color)
+                //Mesh finalMesh = CombineMeshesPreserveSubmeshes(subMeshList); // new Mesh();
                 Mesh finalMesh = new Mesh();
                 finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
+
+                if (finalMesh.subMeshCount != materialList.Count)
+                    Debug.Log($"Mismatch in submesh count: {finalMesh.subMeshCount} vs materials: {materialList.Count}");
+                else
+                    Debug.Log($"No Mismatch in submesh count");
 
                 var ldrawMesh = new LDrawMesh { mesh = finalMesh, isCW = true };
                 meshCache[partId] = ldrawMesh;
