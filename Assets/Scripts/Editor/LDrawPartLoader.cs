@@ -48,6 +48,23 @@ namespace LDraw.Editor
             return newMesh;
         }
 
+        // public static Material GetOrCreateMaterial(Color color)
+        // {
+        //     string materialFolder = "Assets/Resources/LDrawMaterials";
+        //     if (!Directory.Exists(materialFolder))
+        //         Directory.CreateDirectory(materialFolder);
+
+        //     string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
+        //     string matPath = Path.Combine(materialFolder, $"Mat_{colorKey}.mat");
+        //     var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+        //     if (existing != null) return existing;
+
+        //     var mat = new Material(Shader.Find("Standard"));
+        //     mat.color = color;
+        //     AssetDatabase.CreateAsset(mat, matPath);
+        //     AssetDatabase.SaveAssets();
+        //     return mat;
+        // }
         public static Material GetOrCreateMaterial(Color color)
         {
             string materialFolder = "Assets/Resources/LDrawMaterials";
@@ -59,12 +76,21 @@ namespace LDraw.Editor
             var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
             if (existing != null) return existing;
 
-            var mat = new Material(Shader.Find("Standard"));
+            // Use URP Lit shader instead of Standard
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                Debug.LogError("URP Lit shader not found. Make sure URP is installed and set up.");
+                shader = Shader.Find("Standard"); // fallback
+            }
+
+            var mat = new Material(shader);
             mat.color = color;
             AssetDatabase.CreateAsset(mat, matPath);
             AssetDatabase.SaveAssets();
             return mat;
         }
+
 
         public static GameObject SpawnPart(LDrawPart part, string partLibraryPath, string unofficialPartLibraryPath, Dictionary<string, List<LDrawStep>> models)
         {
