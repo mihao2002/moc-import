@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\clones\\moc-import\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\clones\\moc-import\\Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\clones\\moc-import\\Assets\\Scripts\\Editor\\LDrawStepViewerWindow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\Scripts\\Editor\\LDrawStepViewerWindow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -29,6 +33,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "LDrawCamera.cs",
+              "DocumentMoniker": "C:\\clones\\moc-import\\Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs",
+              "ToolTip": "C:\\clones\\moc-import\\Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs",
+              "RelativeToolTip": "Assets\\Scripts\\LDrawRuntime\\LDrawCamera.cs",
+              "ViewState": "AgIAAA8AAAAAAAAAAAAlwCIAAAA5AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-01T20:18:33.035Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "LDrawStepViewerWindow.cs",
               "DocumentMoniker": "C:\\clones\\moc-import\\Assets\\Scripts\\Editor\\LDrawStepViewerWindow.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\Editor\\LDrawStepViewerWindow.cs",
@@ -41,7 +58,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "OrbitCamera.cs",
               "DocumentMoniker": "C:\\clones\\moc-import\\Assets\\Scripts\\LDrawRuntime\\OrbitCamera.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\LDrawRuntime\\OrbitCamera.cs",
@@ -53,7 +70,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "LDrawDoubleSided.shader",
               "DocumentMoniker": "C:\\Users\\mihao\\moc-import\\Assets\\Editor\\LDrawDoubleSided.shader",
               "RelativeDocumentMoniker": "..\\..\\Users\\mihao\\moc-import\\Assets\\Editor\\LDrawDoubleSided.shader",
@@ -64,7 +81,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "LDrawStepViewerWindow.cs",
               "DocumentMoniker": "C:\\Users\\mihao\\moc-import\\Assets\\Editor\\LDrawStepViewerWindow.cs",
               "RelativeDocumentMoniker": "..\\..\\Users\\mihao\\moc-import\\Assets\\Editor\\LDrawStepViewerWindow.cs",

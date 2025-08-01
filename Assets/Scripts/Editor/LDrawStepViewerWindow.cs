@@ -16,6 +16,12 @@ namespace LDraw.Editor
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
         private LDrawStepHierarchyNavigator navigator;
         public Camera mainCamera; // Assign in inspector or via UI
+        
+        // Progress tracking
+        private bool isLoading = false;
+        private float progressValue = 0f;
+        private string progressMessage = "";
+        private bool isCancelled = false;
 
         [MenuItem("Tools/LDraw Step Viewer")]
         public static void ShowWindow()
@@ -99,7 +105,34 @@ namespace LDraw.Editor
 
             if (GUILayout.Button("Load LDraw File"))
             {
-                LoadLDrawFile();
+                // LoadLDrawFile();
+                StartLoadingRoutine();
+            }
+            
+            // Show progress bar when loading
+            if (isLoading)
+            {
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField("Loading Progress", EditorStyles.boldLabel);
+                
+                // Progress bar
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Progress:", GUILayout.Width(60));
+                EditorGUILayout.LabelField($"{progressValue:P1}", GUILayout.Width(50));
+                EditorGUILayout.EndHorizontal();
+                
+                // Custom progress bar
+                Rect progressRect = EditorGUILayout.GetControlRect(false, 20);
+                EditorGUI.ProgressBar(progressRect, progressValue, progressMessage);
+                
+                // Cancel button
+                if (GUILayout.Button("Cancel Loading"))
+                {
+                    isCancelled = true;
+                    LDrawPartLoader.SetCancelled(true);
+                }
+                
+                EditorGUILayout.Space();
             }
 
             if (navigator != null)
@@ -136,6 +169,96 @@ namespace LDraw.Editor
             }
         }
 
+        private IEnumerator<YieldInstruction> LoadLDrawFileCoroutine()
+        {
+            isLoading = true;
+            progressValue = 0f;
+            progressMessage = "Initializing...";
+            isCancelled = false;
+
+            LDrawPartLoader.OnProgressUpdate = (progress, message) =>
+            {
+                progressValue = progress;
+                progressMessage = message;
+                Repaint(); // Let UI refresh
+            };
+
+            string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
+            LDrawColorManager.LoadFromFile(ldconfigPath);
+
+            LDrawPartLoader.ClearCache();
+
+            var models = LDrawParser.ParseModels(ldrawFilePath);
+            LDrawPartLoader.InitializeSubmodelProgress(models.Count);
+
+            navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
+            var modelContainers = new Dictionary<string, ModelContainer>();
+
+            foreach (var kvp in models)
+            {
+                if (isCancelled) break;
+
+                var modelContainer = new ModelContainer(kvp.Key);
+                Bounds modelBounds = new Bounds(Vector3.zero, Vector3.zero);
+
+                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                {
+                    if (isCancelled) break;
+
+                    var step = kvp.Value[stepIdx];
+                    var objs = new List<GameObject>();
+
+                    foreach (var part in step.parts)
+                    {
+                        GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
+                        if (go == null && isCancelled) yield break;
+
+                        objs.Add(go);
+                    }
+
+                    modelContainer.AddStep(objs);
+
+                    var stepGO = modelContainer.GetStepContainer(stepIdx);
+                    if (stepGO != null)
+                    {
+                        var bounds = LDrawUtils.CalculateBounds(stepGO);
+                        modelBounds.Encapsulate(bounds);
+                        step.center = modelBounds.center;
+                        step.radius = modelBounds.extents.magnitude;
+                    }
+
+                    yield return null; // Let UI update
+                }
+
+                modelContainers[kvp.Key] = modelContainer;
+            }
+
+            LDrawParser.SaveModelsToJsonAsset(models);
+
+            navigator.SetModelContainers(modelContainers);
+            navigator.InitializeNavigation();
+
+            LDrawPartLoader.OnProgressUpdate = null;
+            isLoading = false;
+        }
+
+        private IEnumerator<YieldInstruction> loadingRoutine;
+
+        private void StartLoadingRoutine()
+        {
+            loadingRoutine = LoadLDrawFileCoroutine();
+            EditorApplication.update += RunLoadingRoutine;
+        }
+
+        private void RunLoadingRoutine()
+        {
+            if (loadingRoutine == null || !loadingRoutine.MoveNext())
+            {
+                EditorApplication.update -= RunLoadingRoutine;
+                loadingRoutine = null;
+            }
+        }
+
         void LoadLDrawFile()
         {
             if (!File.Exists(ldrawFilePath))
@@ -144,12 +267,28 @@ namespace LDraw.Editor
                 return;
             }
 
+            // Initialize progress tracking
+            isLoading = true;
+            progressValue = 0f;
+            progressMessage = "Initializing...";
+            isCancelled = false;
+            
+            // Set up progress callback
+            LDrawPartLoader.OnProgressUpdate = (progress, message) =>
+            {
+                progressValue = progress;
+                progressMessage = message;
+                Repaint(); // Force window to redraw
+            };
+
             string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
             LDrawColorManager.LoadFromFile(ldconfigPath);
 
             LDrawPartLoader.ClearCache();
 
             var models = LDrawParser.ParseModels(ldrawFilePath);
+            // Initialize submodel progress tracking
+            LDrawPartLoader.InitializeSubmodelProgress(models.Count);
          
             // Create navigator with the models
             navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
@@ -158,6 +297,14 @@ namespace LDraw.Editor
             var modelContainers = new Dictionary<string, ModelContainer>();
             foreach (var kvp in models)
             {
+                // Check for cancellation
+                if (isCancelled)
+                {
+                    isLoading = false;
+                    EditorUtility.DisplayDialog("Loading Cancelled", "LDraw file loading was cancelled by the user.", "OK");
+                    return;
+                }
+                
                 var modelContainer = new ModelContainer(kvp.Key);
                 Bounds modelBounds = new Bounds(Vector3.zero, Vector3.zero);
                 for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
@@ -167,6 +314,12 @@ namespace LDraw.Editor
                     foreach (var part in step.parts)
                     {
                         GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
+                        if (go == null && isCancelled)
+                        {
+                            isLoading = false;
+                            EditorUtility.DisplayDialog("Loading Cancelled", "LDraw file loading was cancelled by the user.", "OK");
+                            return;
+                        }
                         objs.Add(go);
                     }
                     modelContainer.AddStep(objs);
@@ -198,6 +351,10 @@ namespace LDraw.Editor
             navigator.SetModelContainers(modelContainers);
             // Initialize navigation
             navigator.InitializeNavigation();
+            
+            // Clear progress tracking when loading completes successfully
+            isLoading = false;
+            LDrawPartLoader.OnProgressUpdate = null;
         }
     }
 }

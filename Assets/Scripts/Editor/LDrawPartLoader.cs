@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using LDraw.Runtime;
+using UnityEngine.Rendering;
 
 namespace LDraw.Editor
 {
@@ -18,6 +19,14 @@ namespace LDraw.Editor
     {
         private static Dictionary<string, LDrawMesh> meshCache = new Dictionary<string, LDrawMesh>();
         private static HashSet<string> loadingParts = new HashSet<string>();
+        
+        // Submodel progress tracking
+        private static int totalSubmodels = 0;
+        private static int loadedSubmodels = 0;
+        private static bool isCancelled = false;
+        
+        // Progress callback
+        public static System.Action<float, string> OnProgressUpdate;
 
         public static Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
@@ -235,6 +244,10 @@ namespace LDraw.Editor
             // Build the combined mesh
             Mesh combined = new Mesh();
             combined.name = "CombinedMesh";
+            
+            // Set index format to UInt32 to support more than 65,535 vertices
+            combined.indexFormat = IndexFormat.UInt32;
+            
             combined.SetVertices(allVertices);
 
             if (allNormals.Count == allVertices.Count)
@@ -267,6 +280,19 @@ namespace LDraw.Editor
             // Check if this is an in-memory submodel
             if (models != null && models.ContainsKey(partId))
             {
+                // Update submodel progress
+                loadedSubmodels++;
+                float progress = (float)loadedSubmodels / totalSubmodels;
+                
+                // Update progress via callback
+                OnProgressUpdate?.Invoke(progress, $"Loading {partId}");
+                
+                // Check for cancellation
+                if (isCancelled)
+                {
+                    return null;
+                }
+                
                 Debug.Log($"Loading mesh for {partId} from in-memory models");
                 loadingParts.Add(partId);
 
@@ -377,6 +403,10 @@ namespace LDraw.Editor
                 // Final combined mesh with multiple submeshes (1 per color)
                 //Mesh finalMesh = CombineMeshesPreserveSubmeshes(subMeshList); // new Mesh();
                 Mesh finalMesh = new Mesh();
+                
+                // Set index format to UInt32 to support more than 65,535 vertices
+                finalMesh.indexFormat = IndexFormat.UInt32;
+                
                 finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
 
                 if (finalMesh.subMeshCount != materialList.Count)
@@ -704,6 +734,23 @@ namespace LDraw.Editor
         {
             meshCache.Clear();
             loadingParts.Clear();
+        }
+        
+        public static void InitializeSubmodelProgress(int totalSubmodels)
+        {
+            LDrawPartLoader.totalSubmodels = totalSubmodels;
+            loadedSubmodels = 0;
+            isCancelled = false;
+        }
+        
+        public static bool IsCancelled()
+        {
+            return isCancelled;
+        }
+        
+        public static void SetCancelled(bool cancelled)
+        {
+            isCancelled = cancelled;
         }
     }
 }
