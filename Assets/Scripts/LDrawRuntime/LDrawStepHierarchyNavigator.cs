@@ -90,6 +90,8 @@ namespace LDraw.Runtime
 
         private void ShowHierarchicalStep()
         {
+            Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
+
             // Hide all models
             foreach (var container in modelContainers.Values)
             {
@@ -141,7 +143,12 @@ namespace LDraw.Runtime
             if (stepIdx < modelSteps.Count)
             {
                 var step = modelSteps[stepIdx];
-                ldrawCamera.SetCamera(step.center, step.radius, modelSteps[stepIdx].rotation);
+                var rotation = modelSteps[stepIdx].rotation;
+                if (rotation == null)
+                {
+                    rotation = modelSteps[stepIdx].rotRef == -1 ? defaultRotation : modelSteps[modelSteps[stepIdx].rotRef].rotation;
+                }
+                ldrawCamera.SetCamera(step.center, step.radius, rotation);
             }
         }
 

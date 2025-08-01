@@ -13,6 +13,7 @@ namespace LDraw.Runtime
         
         // Rotation support for submodels
         public Vector3? rotation; // null = no rotation, Vector3.zero = ROTSTEP END, other values = rotation angles
+        public int rotRef; // index of another step whose rotation will be applied in this step, -1 means the default rotation
         public float radius; // always set by editor
         public Vector3 center; // the center of the game object
     }

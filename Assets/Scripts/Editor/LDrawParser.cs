@@ -59,12 +59,12 @@ namespace LDraw.Editor
             //     Quaternion.AngleAxis(45f, Vector3.up) * 
             //     Quaternion.LookRotation(Vector3.back, Vector3.down));
             // Quaternion defaultQuaternion = Quaternion.Euler(30f, 45f, 0f);
-            Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
+            // Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
 
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
             var hasModelInStep = false;
-            var currentRotation = defaultRotation;
+            var currentRotationRef = -1;
             for (int i = start; i < end; i++)
             {
                 var line = lines[i];
@@ -84,26 +84,26 @@ namespace LDraw.Editor
                                 var type = tokens[5].ToUpper();
                                 if (type == "END")
                                 {
-                                    currentRotation = defaultRotation;
-                                    currentStep.rotation = defaultRotation; // Vector3.zero; // ROTSTEP END
+                                    currentRotationRef = -1;
+                                    currentStep.rotRef = currentRotationRef; // Vector3.zero; // ROTSTEP END
                                 }
                                 else if (type == "ABS")
                                 {
-                                    currentRotation = new Vector3(
+                                    currentStep.rotation = new Vector3(
                                         float.Parse(tokens[2]),
                                         float.Parse(tokens[3]),
                                         float.Parse(tokens[4]));
-                                    currentStep.rotation = currentRotation;
+                                    currentRotationRef = steps.Count;
                                 }
                                 else
                                 {
                                     Debug.LogWarning($"ROTSTEP with unsupported type: {type}. Line: {line}");
                                 }
                             }
-                            // For normal STEP, add rotation if it is the first step or there is model in the step
-                            else if ((steps.Count == 0 || hasModelInStep) && currentStep.rotation == null)
+                            // For normal STEP, just refer to the last rotation step
+                            else
                             {
-                                currentStep.rotation = currentRotation;
+                                currentStep.rotRef = currentRotationRef;
                             }
 
                             steps.Add(currentStep);
@@ -143,7 +143,7 @@ namespace LDraw.Editor
             if (currentStep.parts.Count > 0)
             {
                 // Always has rotation for the last step
-                currentStep.rotation = currentRotation;
+                currentStep.rotRef = currentRotationRef;
                 steps.Add(currentStep);
             }
             else
@@ -152,7 +152,7 @@ namespace LDraw.Editor
                 // Ensure the last step has rotation
                 if (lastStep >= 0 && steps[lastStep].rotation == null)
                 {
-                    steps[lastStep].rotation = currentRotation;
+                    steps[lastStep].rotRef = currentRotationRef;
                 }
             }
                 
