@@ -16,7 +16,7 @@ namespace LDraw.Runtime
             modelContainer.SetActive(false); // Hide by default
         }
 
-        public void AddStep(List<GameObject> stepObjects)
+        public GameObject AddStep(List<GameObject> stepObjects)
         {
             GameObject stepContainer = new GameObject($"Step_{stepContainers.Count}");
             stepContainer.transform.SetParent(modelContainer.transform, worldPositionStays: false);
@@ -29,6 +29,7 @@ namespace LDraw.Runtime
             }
 
             stepContainers.Add(stepContainer);
+            return stepContainer;
         }
 
         public void Show(bool show)

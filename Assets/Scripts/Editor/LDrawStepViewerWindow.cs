@@ -16,6 +16,8 @@ namespace LDraw.Editor
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
         private LDrawStepHierarchyNavigator navigator;
         public Camera mainCamera; // Assign in inspector or via UI
+
+        
         
         // Progress tracking
         private bool isLoading = false;
@@ -26,8 +28,14 @@ namespace LDraw.Editor
         [MenuItem("Tools/LDraw Step Viewer")]
         public static void ShowWindow()
         {
-            CleanUpResourceFiles();
             GetWindow<LDrawStepViewerWindow>("LDraw Step Viewer");
+        }
+
+        private void OnProgressUpdate(float progress, string message)
+        {
+            progressValue = progress;
+            progressMessage = message;
+            Repaint(); // Let UI refresh
         }
 
         // Delete all generated resource files and folders (prefabs, materials, red material asset, and their .meta files)
@@ -110,7 +118,7 @@ namespace LDraw.Editor
             }
             
             // Show progress bar when loading
-            if (isLoading)
+            if (isLoading && !isCancelled)
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Loading Progress", EditorStyles.boldLabel);
@@ -129,7 +137,6 @@ namespace LDraw.Editor
                 if (GUILayout.Button("Cancel Loading"))
                 {
                     isCancelled = true;
-                    LDrawPartLoader.SetCancelled(true);
                 }
                 
                 EditorGUILayout.Space();
@@ -172,66 +179,156 @@ namespace LDraw.Editor
         private IEnumerator<YieldInstruction> LoadLDrawFileCoroutine()
         {
             isLoading = true;
-            progressValue = 0f;
-            progressMessage = "Initializing...";
             isCancelled = false;
-
-            LDrawPartLoader.OnProgressUpdate = (progress, message) =>
-            {
-                progressValue = progress;
-                progressMessage = message;
-                Repaint(); // Let UI refresh
-            };
 
             string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
             LDrawColorManager.LoadFromFile(ldconfigPath);
 
+            OnProgressUpdate(0f, "Clearing cache...");
+            yield return null;
+
             LDrawPartLoader.ClearCache();
 
+            OnProgressUpdate(0f, "Parsing models...");
+            yield return null;
+
             var models = LDrawParser.ParseModels(ldrawFilePath);
-            LDrawPartLoader.InitializeSubmodelProgress(models.Count);
 
             navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
             var modelContainers = new Dictionary<string, ModelContainer>();
 
+            // get model dependency and all parts
+            var parts = new HashSet<string>();
+            var modelDependency = new Dictionary<string, HashSet<string>>();
             foreach (var kvp in models)
             {
-                if (isCancelled) break;
+                var dependencies = new HashSet<string>();
+                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                {
+                    var step = kvp.Value[stepIdx];
+                    foreach (var part in step.parts)
+                    {
+                        if (models.ContainsKey(part.partId))
+                        {
+                            dependencies.Add(part.partId);
+                        }
+                        else
+                        {
+                            parts.Add(part.partId);
+                        }
+                    }
+                }
 
+                modelDependency[kvp.Key] = dependencies;
+            }            
+
+            // sort all models so that a model always locates behind any of its dependency.
+            var sortedModels = new List<string>();
+            while (modelDependency.Count > 0)
+            {
+                string key = null;
+                foreach (var kvp in modelDependency)
+                {
+                    if (kvp.Value.Count == 0)
+                    {
+                        key = kvp.Key;
+                        break;
+                    }
+                }
+
+                if (key == null)
+                {
+                    Debug.LogError($"Circular dependency in models.");
+                    yield break;
+                }
+
+                sortedModels.Add(key);
+                modelDependency.Remove(key);
+                foreach (var kvp in modelDependency)
+                {
+                    kvp.Value.Remove(key);
+                }
+            }
+
+            OnProgressUpdate(0f, "Loading parts...");
+            yield return null;
+
+            // first load all parts
+            var partCount = parts.Count;
+            var loadedPartCount = 0f;
+
+            foreach (string partId in parts)
+            {
+                OnProgressUpdate(loadedPartCount/partCount, $"Loading part {partId}...");
+                yield return null;
+
+                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficialPartLibraryPath);
+                loadedPartCount++;
+
+                if (isCancelled) yield break;                
+            }
+
+            OnProgressUpdate(0f, "Loading models...");
+            yield return null;
+
+            // then load all submodels
+            var modelCount = sortedModels.Count;
+            var loadedModelCount = 0f;
+            foreach (var modelId in sortedModels)
+            {
+                OnProgressUpdate(loadedModelCount/modelCount, $"Loading model {modelId}...");
+                yield return null;
+
+                LDrawPartLoader.LoadSubmodelFromLibrary(modelId, models[modelId]);
+                loadedModelCount++;
+
+                if (isCancelled) yield break;
+            }
+
+            OnProgressUpdate(0f, "Loading model steps...");
+            yield return null;
+
+            // construct model steps
+            var steppedModelCount = models.Count;
+            var loadedSteppedModelCount = 0f;
+            foreach (var kvp in models)
+            {
+                var steps = models[kvp.Key];
                 var modelContainer = new ModelContainer(kvp.Key);
                 Bounds modelBounds = new Bounds(Vector3.zero, Vector3.zero);
 
-                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                for (int stepIdx = 0; stepIdx < steps.Count; stepIdx++)
                 {
-                    if (isCancelled) break;
+                    OnProgressUpdate(loadedSteppedModelCount/steppedModelCount, $"Loading model {kvp.Key} step {stepIdx+1}...");
+                    yield return null;
 
-                    var step = kvp.Value[stepIdx];
+                    var step = steps[stepIdx];
                     var objs = new List<GameObject>();
 
                     foreach (var part in step.parts)
                     {
-                        GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
-                        if (go == null && isCancelled) yield break;
+                        GameObject go = LDrawPartLoader.GetGameObject(part.partId, part.color);
+                        go.transform.position = part.position;
+                        go.transform.rotation = part.rotation;
 
                         objs.Add(go);
                     }
 
-                    modelContainer.AddStep(objs);
+                    var stepGO = modelContainer.AddStep(objs);
+                    var bounds = LDrawUtils.CalculateBounds(stepGO);
+                    modelBounds.Encapsulate(bounds);
+                    step.center = modelBounds.center;
+                    step.radius = modelBounds.extents.magnitude;
 
-                    var stepGO = modelContainer.GetStepContainer(stepIdx);
-                    if (stepGO != null)
-                    {
-                        var bounds = LDrawUtils.CalculateBounds(stepGO);
-                        modelBounds.Encapsulate(bounds);
-                        step.center = modelBounds.center;
-                        step.radius = modelBounds.extents.magnitude;
-                    }
-
-                    yield return null; // Let UI update
+                    if (isCancelled) yield break;
                 }
 
                 modelContainers[kvp.Key] = modelContainer;
+                loadedSteppedModelCount++;                
             }
+
+            OnProgressUpdate(1f, "Done");
+            yield return null;    
 
             LDrawParser.SaveModelsToJsonAsset(models);
 
@@ -246,6 +343,7 @@ namespace LDraw.Editor
 
         private void StartLoadingRoutine()
         {
+            CleanUpResourceFiles();
             loadingRoutine = LoadLDrawFileCoroutine();
             EditorApplication.update += RunLoadingRoutine;
         }
@@ -257,104 +355,6 @@ namespace LDraw.Editor
                 EditorApplication.update -= RunLoadingRoutine;
                 loadingRoutine = null;
             }
-        }
-
-        void LoadLDrawFile()
-        {
-            if (!File.Exists(ldrawFilePath))
-            {
-                EditorUtility.DisplayDialog("Error", "LDraw file not found!", "OK");
-                return;
-            }
-
-            // Initialize progress tracking
-            isLoading = true;
-            progressValue = 0f;
-            progressMessage = "Initializing...";
-            isCancelled = false;
-            
-            // Set up progress callback
-            LDrawPartLoader.OnProgressUpdate = (progress, message) =>
-            {
-                progressValue = progress;
-                progressMessage = message;
-                Repaint(); // Force window to redraw
-            };
-
-            string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
-            LDrawColorManager.LoadFromFile(ldconfigPath);
-
-            LDrawPartLoader.ClearCache();
-
-            var models = LDrawParser.ParseModels(ldrawFilePath);
-            // Initialize submodel progress tracking
-            LDrawPartLoader.InitializeSubmodelProgress(models.Count);
-         
-            // Create navigator with the models
-            navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
-            
-            // Editor-specific: instantiate parts using LDrawPartLoader
-            var modelContainers = new Dictionary<string, ModelContainer>();
-            foreach (var kvp in models)
-            {
-                // Check for cancellation
-                if (isCancelled)
-                {
-                    isLoading = false;
-                    EditorUtility.DisplayDialog("Loading Cancelled", "LDraw file loading was cancelled by the user.", "OK");
-                    return;
-                }
-                
-                var modelContainer = new ModelContainer(kvp.Key);
-                Bounds modelBounds = new Bounds(Vector3.zero, Vector3.zero);
-                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
-                {
-                    var step = kvp.Value[stepIdx];
-                    var objs = new List<GameObject>();
-                    foreach (var part in step.parts)
-                    {
-                        GameObject go = LDrawPartLoader.SpawnPart(part, partLibraryPath, unofficialPartLibraryPath, models);
-                        if (go == null && isCancelled)
-                        {
-                            isLoading = false;
-                            EditorUtility.DisplayDialog("Loading Cancelled", "LDraw file loading was cancelled by the user.", "OK");
-                            return;
-                        }
-                        objs.Add(go);
-                    }
-                    modelContainer.AddStep(objs);
-
-                    // // Always assume original rotation is identity
-                    // if (step.rotation.HasValue)
-                    //     modelContainer.Rotate(step.rotation.Value.x, step.rotation.Value.y, step.rotation.Value.z);
-
-                    // Calculate and store camera distance for this step
-                    var stepGO = modelContainer.GetStepContainer(stepIdx);
-                    if (stepGO != null)
-                    {
-                        var bounds = LDrawUtils.CalculateBounds(stepGO);
-                        modelBounds.Encapsulate(bounds);
-                        // float distance = LDrawUtils.ComputeCameraDistance(bounds);
-                        // step.cameraDistance = distance;
-                        step.center = modelBounds.center;
-                        step.radius = modelBounds.extents.magnitude;
-                    }
-                }
-                // Restore to identity rotation after all steps
-                // modelContainer.Rotate(0, 0, 0);
-                modelContainers[kvp.Key] = modelContainer;
-            }
-
-            LDrawParser.SaveModelsToJsonAsset(models);
-
-            // Set the modelContainers in the navigator
-            navigator.SetModelContainers(modelContainers);
-            // Initialize navigation
-            navigator.InitializeNavigation();
-            
-            // Clear progress tracking when loading completes successfully
-            isLoading = false;
-            LDrawPartLoader.OnProgressUpdate = null;
         }
     }
 }
