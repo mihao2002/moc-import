@@ -193,12 +193,13 @@ namespace LDraw.Editor
             yield return null;
 
             var models = LDrawParser.ParseModels(ldrawFilePath);
+            if (!models.ContainsKey(LDrawParser.mainModelName))
+            {
+                Debug.LogError("Main model is not found.");
+                yield break;
+            }
 
-            navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
-            var modelContainers = new Dictionary<string, ModelContainer>();
-
-            // get model dependency and all parts
-            var parts = new HashSet<string>();
+            // Build the model dependency
             var modelDependency = new Dictionary<string, HashSet<string>>();
             foreach (var kvp in models)
             {
@@ -212,19 +213,56 @@ namespace LDraw.Editor
                         {
                             dependencies.Add(part.partId);
                         }
-                        else
+                    }
+                }
+
+                modelDependency[kvp.Key] = dependencies;
+            }
+
+            // Get all models being used
+            var usedModels = new List<string>{LDrawParser.mainModelName};
+            var index = 0;
+            while (index < usedModels.Count)
+            {
+                usedModels.AddRange(modelDependency[usedModels[index]]);
+                index++;
+            }
+
+            var usedModelSet = new HashSet<string>(usedModels);
+
+            // Remove all unused models
+            foreach (var key in models.Keys.ToList())
+            {
+                if (!usedModelSet.Contains(key))
+                {
+                    models.Remove(key);
+                    modelDependency.Remove(key);
+                }
+            }
+
+            navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
+            var modelContainers = new Dictionary<string, ModelContainer>();
+
+            // get model dependency and all parts
+            var parts = new HashSet<string>();
+            foreach (var kvp in models)
+            {
+                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                {
+                    var step = kvp.Value[stepIdx];
+                    foreach (var part in step.parts)
+                    {
+                        if (!models.ContainsKey(part.partId))
                         {
                             parts.Add(part.partId);
                         }
                     }
                 }
-
-                modelDependency[kvp.Key] = dependencies;
             }            
 
             // sort all models so that a model always locates behind any of its dependency.
             var sortedModels = new List<string>();
-            while (modelDependency.Count > 0)
+            while (modelDependency.Count > 1)
             {
                 string key = null;
                 foreach (var kvp in modelDependency)
