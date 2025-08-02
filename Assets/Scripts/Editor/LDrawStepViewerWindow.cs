@@ -192,15 +192,12 @@ namespace LDraw.Editor
             OnProgressUpdate(0f, "Parsing models...");
             yield return null;
 
-            var models = LDrawParser.ParseModels(ldrawFilePath);
-            if (!models.ContainsKey(LDrawParser.mainModelName))
-            {
-                Debug.LogError("Main model is not found.");
-                yield break;
-            }
+            var (mainModelName, models) = LDrawParser.ParseModels(ldrawFilePath);
+
 
             // Build the model dependency
             var modelDependency = new Dictionary<string, HashSet<string>>();
+            var allDependants = new HashSet<string>();
             foreach (var kvp in models)
             {
                 var dependencies = new HashSet<string>();
@@ -212,6 +209,7 @@ namespace LDraw.Editor
                         if (models.ContainsKey(part.partId))
                         {
                             dependencies.Add(part.partId);
+                            allDependants.Add(part.partId);
                         }
                     }
                 }
@@ -220,7 +218,7 @@ namespace LDraw.Editor
             }
 
             // Get all models being used
-            var usedModels = new List<string>{LDrawParser.mainModelName};
+            var usedModels = new List<string>{mainModelName};
             var index = 0;
             while (index < usedModels.Count)
             {
@@ -371,7 +369,7 @@ namespace LDraw.Editor
             LDrawParser.SaveModelsToJsonAsset(models);
 
             navigator.SetModelContainers(modelContainers);
-            navigator.InitializeNavigation();
+            navigator.InitializeNavigation(mainModelName);
 
             LDrawPartLoader.OnProgressUpdate = null;
             isLoading = false;

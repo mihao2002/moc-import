@@ -14,11 +14,12 @@ namespace LDraw.Editor
         public static string mainModelName = "main.ldr";
 
         // New: Parse all models and their steps, without recursive expansion
-        public static Dictionary<string, List<LDrawStep>> ParseModels(string filePath)
+        public static (string, Dictionary<string, List<LDrawStep>>) ParseModels(string filePath)
         {
             var lines = File.ReadAllLines(filePath);
             var models = new Dictionary<string, List<LDrawStep>>();
             var modelNames = new HashSet<string>();
+            string mainModelName = null;
             string currentModel = mainModelName;
             int modelStart = 0;
             var fileSections = new List<(string name, int start, int end)>();
@@ -46,10 +47,11 @@ namespace LDraw.Editor
 
             foreach (var (name, start, end) in fileSections)
             {
+                if (mainModelName == null) mainModelName = name;
                 models[name] = ParseStepsFromLines(lines, start, end, modelNames);
             }
 
-            return models;
+            return (mainModelName, models);
         }
 
         // Helper: Parse a range of lines into steps

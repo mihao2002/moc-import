@@ -10,6 +10,7 @@ namespace LDraw.Runtime
         private List<(string modelName, int stepIndex, int doneSubmodel)> navigationStack = new List<(string, int, int)>();
         private Dictionary<string, ModelContainer> modelContainers = new Dictionary<string, ModelContainer>();
         private LDrawCamera ldrawCamera;
+        private string mainModelName;
        
         public LDrawStepHierarchyNavigator(Dictionary<string, List<LDrawStep>> models, Camera mainCamera)
         {
@@ -18,10 +19,11 @@ namespace LDraw.Runtime
         }
 
         // Call this method after setting up modelContainers with your own instantiation logic
-        public void InitializeNavigation()
+        public void InitializeNavigation(string mainModelName)
         {
+            this.mainModelName = mainModelName;
             navigationStack.Clear();
-            AddNextNavigationStackStep("main.ldr", 0, 0);
+            AddNextNavigationStackStep(mainModelName, 0, 0);
             ShowHierarchicalStep();
         }
 
@@ -83,8 +85,8 @@ namespace LDraw.Runtime
             get
             {
                 return navigationStack.Count == 1
-                    && models.ContainsKey("main.ldr")
-                    && navigationStack[0].stepIndex == models["main.ldr"].Count - 1;
+                    && models.ContainsKey(this.mainModelName)
+                    && navigationStack[0].stepIndex == models[this.mainModelName].Count - 1;
             }
         }
 

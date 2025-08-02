@@ -20,12 +20,6 @@ namespace LDraw.Editor
         private static Dictionary<string, LDrawMesh> partCache = new Dictionary<string, LDrawMesh>();
         private static Dictionary<string, GameObject> submodelCache = new Dictionary<string, GameObject>();
         private static Dictionary<string, List<LDrawStep>> models = new Dictionary<string, List<LDrawStep>>();     
-
-        
-        // Submodel progress tracking
-        private static int totalSubmodels = 0;
-        private static int loadedSubmodels = 0;
-        private static bool isCancelled = false;
         
         // Progress callback
         public static System.Action<float, string> OnProgressUpdate;
