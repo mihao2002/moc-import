@@ -558,7 +558,6 @@ namespace LDraw.Editor
             return subMesh;
         }
 
-
         // Overload: allow passing in-memory models for submodel mesh generation, and indicate if this is a top-level part
         public static GameObject LoadSubmodelFromLibrary(string partId, List<LDrawStep> steps)
         {
@@ -637,7 +636,9 @@ namespace LDraw.Editor
 
                         for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
                         {
-                            // Mesh submesh = UnityEngine.Object.Instantiate(meshCopy);
+                            // Mesh submesh = new Mesh();
+                            // submesh.vertices = meshCopy.vertices;
+                            // submesh.normals = meshCopy.normals;
                             // submesh.triangles = meshCopy.GetTriangles(subIdx);
                             // submesh.RecalculateBounds();
                             Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
@@ -665,6 +666,7 @@ namespace LDraw.Editor
             {                    
                 var material = kvp.Key;
                 // Can use groupMesh.CombineMeshes, because it only take the first mesh for some reason
+                // var groupMesh = CombineMeshesPreserveSubmeshes(kvp.Value);
                 Mesh groupMesh = new Mesh();           
                 groupMesh.indexFormat = IndexFormat.UInt32;
                 groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // keep submeshes separate
