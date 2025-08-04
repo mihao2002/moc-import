@@ -33,8 +33,10 @@ namespace LDraw.Runtime
             }
             navigator = new LDrawStepHierarchyNavigator(models, mainCamera != null ? mainCamera : Camera.main);
             var mainModelName = wrapper.models[0].modelName;
-            navigator.InitializeNavigation(mainModelName); // Initialize navigation first
+
             PreInstantiateAllParts(); // Runtime-specific: instantiate from prefabs
+            navigator.InitializeNavigation(mainModelName); // Initialize navigation first
+
             UpdateNavigationText();
         }
 
