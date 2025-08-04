@@ -592,8 +592,7 @@ namespace LDraw.Editor
                             return null;
                         }
 
-                        //meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
-                        meshCopy = meshFilter.sharedMesh;
+                        meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
                     }
                     else
                     {
@@ -684,7 +683,7 @@ namespace LDraw.Editor
             
             // Set index format to UInt32 to support more than 65,535 vertices
             finalMesh.indexFormat = IndexFormat.UInt32;
-            finalMesh.CombineMeshes(subMeshList.ToArray(), false, true); // keep submeshes separate
+            finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
 
             if (finalMesh.subMeshCount != materialList.Count)
             {
