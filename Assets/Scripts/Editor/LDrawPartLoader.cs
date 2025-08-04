@@ -513,6 +513,52 @@ namespace LDraw.Editor
             return ldrawMesh;
         }
 
+        private static Mesh ExtractSubMesh(Mesh sourceMesh, int subMeshIndex)
+        {
+            int[] triangles = sourceMesh.GetTriangles(subMeshIndex);
+            Vector3[] sourceVertices = sourceMesh.vertices;
+            Vector3[] sourceNormals = sourceMesh.normals;
+            Vector2[] sourceUVs = sourceMesh.uv;
+
+            // Find all used vertex indices
+            HashSet<int> usedIndices = new HashSet<int>(triangles);
+
+            // Map old vertex index → new vertex index
+            Dictionary<int, int> indexMap = new Dictionary<int, int>();
+            List<Vector3> newVertices = new List<Vector3>();
+            List<Vector3> newNormals = new List<Vector3>();
+            List<Vector2> newUVs = new List<Vector2>();
+
+            foreach (int i in usedIndices)
+            {
+                int newIndex = newVertices.Count;
+                indexMap[i] = newIndex;
+                newVertices.Add(sourceVertices[i]);
+                if (sourceNormals.Length > i) newNormals.Add(sourceNormals[i]);
+                if (sourceUVs.Length > i) newUVs.Add(sourceUVs[i]);
+            }
+
+            // Remap triangle indices
+            int[] newTriangles = new int[triangles.Length];
+            for (int i = 0; i < triangles.Length; i++)
+            {
+                newTriangles[i] = indexMap[triangles[i]];
+            }
+
+            // Create new mesh
+            Mesh subMesh = new Mesh();
+            subMesh.indexFormat = IndexFormat.UInt32;
+            subMesh.vertices = newVertices.ToArray();
+            if (newNormals.Count == newVertices.Count) subMesh.normals = newNormals.ToArray();
+            if (newUVs.Count == newVertices.Count) subMesh.uv = newUVs.ToArray();
+            subMesh.triangles = newTriangles;
+            subMesh.RecalculateBounds();
+            //subMesh.RecalculateNormals(); // Optional: recalculate if you don't trust imported normals
+
+            return subMesh;
+        }
+
+
         // Overload: allow passing in-memory models for submodel mesh generation, and indicate if this is a top-level part
         public static GameObject LoadSubmodelFromLibrary(string partId, List<LDrawStep> steps)
         {
@@ -547,7 +593,8 @@ namespace LDraw.Editor
                             return null;
                         }
 
-                        meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
+                        //meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
+                        meshCopy = meshFilter.sharedMesh;
                     }
                     else
                     {
@@ -590,11 +637,10 @@ namespace LDraw.Editor
 
                         for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
                         {
-                            Mesh submesh = new Mesh();
-                            submesh.vertices = meshCopy.vertices;
-                            submesh.normals = meshCopy.normals;
-                            submesh.triangles = meshCopy.GetTriangles(subIdx);
-                            submesh.RecalculateBounds();
+                            // Mesh submesh = UnityEngine.Object.Instantiate(meshCopy);
+                            // submesh.triangles = meshCopy.GetTriangles(subIdx);
+                            // submesh.RecalculateBounds();
+                            Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
                             var ci = new CombineInstance
                             {
                                 mesh = submesh,
@@ -619,7 +665,10 @@ namespace LDraw.Editor
             {                    
                 var material = kvp.Key;
                 // Can use groupMesh.CombineMeshes, because it only take the first mesh for some reason
-                var groupMesh = CombineMeshesPreserveSubmeshes(kvp.Value);
+                Mesh groupMesh = new Mesh();           
+                groupMesh.indexFormat = IndexFormat.UInt32;
+                groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // keep submeshes separate
+
                 subMeshList.Add(new CombineInstance
                 {
                     mesh = groupMesh,
@@ -633,15 +682,13 @@ namespace LDraw.Editor
             
             // Set index format to UInt32 to support more than 65,535 vertices
             finalMesh.indexFormat = IndexFormat.UInt32;
-            finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
+            finalMesh.CombineMeshes(subMeshList.ToArray(), false, true); // keep submeshes separate
 
             if (finalMesh.subMeshCount != materialList.Count)
             {
                 Debug.LogError($"Mismatch in submesh count: {finalMesh.subMeshCount} vs materials: {materialList.Count} for for submodel {partId}.");
                 return null;
             }
-
-            var ldrawMesh = new LDrawMesh { mesh = finalMesh, isCW = true };
 
             // Save prefab with all submeshes and materials
             GameObject go = new GameObject(partId);
