@@ -33,7 +33,8 @@ namespace Xenon
             public float NormalThreshold = 0.4f;
             public float SteepAngleThreshold = 0.2f;
             public float SteepAngleMultiplier = 25f;
-            public Color OutlineColor = Color.white;
+            public Color OutlineColorA = Color.white;
+            public Color OutlineColorB = Color.black;
         }
 
         public class OutlineData : ContextItem

@@ -21,7 +21,8 @@ namespace Xenon
         private static readonly int NormalThreshold = Shader.PropertyToID("_NormalThreshold");
         private static readonly int SteepAngleThreshold = Shader.PropertyToID("_SteepAngleThreshold");
         private static readonly int SteepAngleMultiplier = Shader.PropertyToID("_SteepAngleMultiplier");
-        private static readonly int OutlineColor = Shader.PropertyToID("_OutlineColor");
+        private static readonly int OutlineColorA = Shader.PropertyToID("_OutlineColorA");
+        private static readonly int OutlineColorB = Shader.PropertyToID("_OutlineColorB");
 
         private readonly Material _blitMaterial;
 
@@ -39,7 +40,8 @@ namespace Xenon
             _blitMaterial.SetFloat(NormalThreshold, outlineSettings.NormalThreshold);
             _blitMaterial.SetFloat(SteepAngleThreshold, outlineSettings.SteepAngleThreshold);
             _blitMaterial.SetFloat(SteepAngleMultiplier, outlineSettings.SteepAngleMultiplier);
-            _blitMaterial.SetColor(OutlineColor, outlineSettings.OutlineColor);
+            _blitMaterial.SetColor(OutlineColorA, outlineSettings.OutlineColorA);
+            _blitMaterial.SetColor(OutlineColorB, outlineSettings.OutlineColorB);
         }
 
         private static void ExecutePass(PassData passData, RasterGraphContext context)
