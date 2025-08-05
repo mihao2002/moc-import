@@ -331,7 +331,8 @@ namespace LDraw.Editor
             {
                 var steps = models[kvp.Key];
                 var modelContainer = new ModelContainer(kvp.Key);
-                Bounds modelBounds = new Bounds(Vector3.zero, Vector3.zero);
+                Bounds modelBounds = new Bounds();
+                bool initialized = false;
 
                 for (int stepIdx = 0; stepIdx < steps.Count; stepIdx++)
                 {
@@ -352,9 +353,19 @@ namespace LDraw.Editor
 
                     var stepGO = modelContainer.AddStep(objs);
                     var bounds = LDrawUtils.CalculateBounds(stepGO);
-                    modelBounds.Encapsulate(bounds);
+                    if (!initialized)
+                    {
+                        modelBounds = bounds;
+                        initialized = true;
+                    }
+                    else
+                    {
+                        modelBounds.Encapsulate(bounds);
+                    }
+                    
                     step.center = modelBounds.center;
                     step.radius = modelBounds.extents.magnitude;
+                    Debug.Log($"Model Step: {kvp.Key} {stepIdx} bounds:{bounds} modelBounds:{modelBounds} center:{step.center} radius:{step.radius}");
 
                     if (isCancelled) yield break;
                 }
