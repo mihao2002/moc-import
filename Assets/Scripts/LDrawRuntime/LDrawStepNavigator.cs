@@ -160,7 +160,7 @@ namespace LDraw.Runtime
                     float deltaDistance = currentDistance - lastPinchDistance;
                     lastPinchDistance = currentDistance;
 
-                    ApplyZoomDelta(deltaDistance * 0.1f);
+                    ApplyZoomDelta(deltaDistance * 0.03f);
                 }
 
                 isDragging = false;
