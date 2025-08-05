@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using Newtonsoft.Json;
+using UnityEngine.InputSystem;
 
 namespace LDraw.Runtime
 {
@@ -10,6 +11,9 @@ namespace LDraw.Runtime
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public Camera mainCamera; // Assign in inspector
+        private LDrawCamera camera;
+        private Vector2 lastTouchPosition;
+        private bool isDragging = false;
 
         private LDrawStepHierarchyNavigator navigator;
 
@@ -32,12 +36,86 @@ namespace LDraw.Runtime
                 return;
             }
             navigator = new LDrawStepHierarchyNavigator(models, mainCamera != null ? mainCamera : Camera.main);
+            camera = navigator.GetCamera();
             var mainModelName = wrapper.models[0].modelName;
 
             PreInstantiateAllParts(); // Runtime-specific: instantiate from prefabs
             navigator.InitializeNavigation(mainModelName); // Initialize navigation first
 
             UpdateNavigationText();
+        }
+
+        private void ApplyRotationDelta(Vector2 delta)
+        {
+            float rotationSpeed = 0.2f;
+
+            (Vector3 center, float radius, Vector3 rotationEuler) = camera.GetCameraState();
+            rotationEuler.y -= delta.x * rotationSpeed;
+            rotationEuler.x -= delta.y * rotationSpeed;
+            rotationEuler.x = Mathf.Clamp(rotationEuler.x, -89f, 89f);
+
+            camera.SetCamera(center, radius, rotationEuler);
+        }
+
+        private void HandleSingleFingerRotation()
+        {
+        #if UNITY_EDITOR || UNITY_STANDALONE
+            // PC: Use new Input System's mouse
+            var mouse = Mouse.current;
+            if (mouse == null) return; // safety check if no mouse present
+
+            if (mouse.leftButton.wasPressedThisFrame)
+            {
+                isDragging = true;
+                lastTouchPosition = mouse.position.ReadValue();
+            }
+            else if (mouse.leftButton.isPressed && isDragging)
+            {
+                Vector2 currentPosition = mouse.position.ReadValue();
+                Vector2 delta = currentPosition - lastTouchPosition;
+                lastTouchPosition = currentPosition;
+
+                ApplyRotationDelta(delta);
+            }
+            else if (mouse.leftButton.wasReleasedThisFrame)
+            {
+                isDragging = false;
+            }
+        #else
+            // Mobile: Use new Input System's touchscreen
+            var touchscreen = Touchscreen.current;
+            if (touchscreen == null) return; // safety if no touchscreen present
+
+            if (touchscreen.primaryTouch.press.isPressed)
+            {
+                var touch = touchscreen.primaryTouch;
+
+                if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began)
+                {
+                    lastTouchPosition = touch.position.ReadValue();
+                    isDragging = true;
+                }
+                else if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Moved && isDragging)
+                {
+                    Vector2 currentPosition = touch.position.ReadValue();
+                    Vector2 delta = currentPosition - lastTouchPosition;
+                    lastTouchPosition = currentPosition;
+
+                    ApplyRotationDelta(delta);
+                }
+                else if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Ended || 
+                        touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Canceled)
+                {
+                    isDragging = false;
+                }
+            }
+        #endif
+        }
+
+
+        public void Update()
+        {
+            HandleSingleFingerRotation();
         }
 
         public void ShowNextStep()

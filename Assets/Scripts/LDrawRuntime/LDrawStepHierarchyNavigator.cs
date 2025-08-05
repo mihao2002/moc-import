@@ -18,6 +18,11 @@ namespace LDraw.Runtime
             ldrawCamera = new LDrawCamera(mainCamera);
         }
 
+        public LDrawCamera GetCamera()
+        {
+            return ldrawCamera;
+        }
+
         // Call this method after setting up modelContainers with your own instantiation logic
         public void InitializeNavigation(string mainModelName)
         {
