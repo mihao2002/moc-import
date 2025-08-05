@@ -37,6 +37,24 @@ namespace LDraw.Runtime
             modelContainer.SetActive(show);
         }
 
+        private void SetLayerRecursively(GameObject obj, int layer)
+        {
+            obj.layer = layer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, layer);
+            }
+        }
+
+        public void HighlightStep(int stepIndex, bool highlight)
+        {
+            if (stepIndex >= 0 && stepIndex < stepContainers.Count)
+            {
+                int layer = LayerMask.NameToLayer(highlight ? "Outline" : "Default");
+                SetLayerRecursively(stepContainers[stepIndex], layer);
+            }
+        }
+
         public void ShowStep(int stepIndex, bool show)
         {
             if (stepIndex >= 0 && stepIndex < stepContainers.Count)

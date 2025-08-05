@@ -59,7 +59,7 @@ namespace LDraw.Runtime
             (Vector3 center, float radius, Vector3 rotationEuler) = camera.GetCameraState();
             rotationEuler.y -= delta.x * rotationSpeed;
             rotationEuler.x -= delta.y * rotationSpeed;
-            rotationEuler.x = Mathf.Clamp(rotationEuler.x, -89f, 89f);
+            //rotationEuler.x = Mathf.Clamp(rotationEuler.x, -89f, 89f);
 
             camera.SetCamera(center, radius, rotationEuler);
         }

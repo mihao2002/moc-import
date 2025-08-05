@@ -11,6 +11,8 @@ namespace LDraw.Runtime
         private Dictionary<string, ModelContainer> modelContainers = new Dictionary<string, ModelContainer>();
         private LDrawCamera ldrawCamera;
         private string mainModelName;
+        private ModelContainer highlightedModel = null;
+        private int highlightedStep = 0;
        
         public LDrawStepHierarchyNavigator(Dictionary<string, List<LDrawStep>> models, Camera mainCamera)
         {
@@ -105,6 +107,12 @@ namespace LDraw.Runtime
                 container.Show(false);
             }
 
+            if (highlightedModel != null)
+            {
+                highlightedModel.HighlightStep(highlightedStep, false);
+                highlightedModel = null;
+            }
+
             // Show the current model
             var stackIdx = navigationStack.Count - 1;
             var (modelName, stepIdx, doneSubmodel) = navigationStack[stackIdx];
@@ -115,31 +123,17 @@ namespace LDraw.Runtime
             var modelSteps = models[modelName];
             Debug.Log($"ShowHierarchicalStep {modelName} {modelSteps.Count} {stepIdx} {modelSteps[stepIdx].rotation.HasValue}");
 
-            // // Apply rotation for current step if it has rotation
-            // if (stepIdx < modelSteps.Count && modelSteps[stepIdx].rotation.HasValue)
-            // {
-            //     var step = modelSteps[stepIdx];
-            //     Vector3 rotationValue = step.rotation.Value;
-
-            //     if (rotationValue == Vector3.zero)
-            //     {
-            //         // Reset rotation to (0,0,0)
-            //         modelContainer.Rotate(0, 0, 0);
-            //         Debug.Log($"Reset rotation for {modelName} to (0,0,0)");
-            //     }
-            //     else
-            //     {
-            //         // Apply rotation
-            //         modelContainer.Rotate(rotationValue.x, rotationValue.y, rotationValue.z);
-            //         Debug.Log($"Applied rotation to {modelName}: {rotationValue}");
-            //     }
-            // }
+            // Highlight the current step
+            modelContainer.HighlightStep(stepIdx, true);
+            highlightedModel = modelContainer;
+            highlightedStep = stepIdx;
 
             // Show steps up to and including stepIdx
             for (int i = 0; i <= stepIdx; i++)
             {
                 modelContainer.ShowStep(i, true);
             }
+
             // Hide steps after stepIdx
             for (int i = stepIdx + 1; i < modelSteps.Count; i++)
             {
