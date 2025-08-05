@@ -8,12 +8,18 @@ namespace LDraw.Runtime
 {
     public class LDrawStepNavigator : MonoBehaviour
     {
+        private float minRadius = 0.5f;
+        private float maxRadius = 30f;
+
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public Camera mainCamera; // Assign in inspector
         private LDrawCamera camera;
         private Vector2 lastTouchPosition;
+        private Vector2 lastMousePosition;
         private bool isDragging = false;
+        private bool isPinching = false;
+        private float lastPinchDistance = 0f;
 
         private LDrawStepHierarchyNavigator navigator;
 
@@ -57,23 +63,33 @@ namespace LDraw.Runtime
             camera.SetCamera(center, radius, rotationEuler);
         }
 
-        private void HandleSingleFingerRotation()
+        private void ApplyZoomDelta(float delta)
         {
-        #if UNITY_EDITOR || UNITY_STANDALONE
-            // PC: Use new Input System's mouse
-            var mouse = Mouse.current;
-            if (mouse == null) return; // safety check if no mouse present
+            var (center, radius, rotationEuler) = camera.GetCameraState();
 
+            radius -= delta;
+            if (radius >= minRadius && radius <= maxRadius)
+            {
+                camera.SetCamera(center, radius, rotationEuler);
+            }
+        }
+
+        private void HandleMouseInput()
+        {
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+
+            // Rotation with left button drag
             if (mouse.leftButton.wasPressedThisFrame)
             {
                 isDragging = true;
-                lastTouchPosition = mouse.position.ReadValue();
+                lastMousePosition = mouse.position.ReadValue();
             }
             else if (mouse.leftButton.isPressed && isDragging)
             {
-                Vector2 currentPosition = mouse.position.ReadValue();
-                Vector2 delta = currentPosition - lastTouchPosition;
-                lastTouchPosition = currentPosition;
+                Vector2 currentPos = mouse.position.ReadValue();
+                Vector2 delta = currentPos - lastMousePosition;
+                lastMousePosition = currentPos;
 
                 ApplyRotationDelta(delta);
             }
@@ -81,19 +97,30 @@ namespace LDraw.Runtime
             {
                 isDragging = false;
             }
-        #else
-            // Mobile: Use new Input System's touchscreen
-            var touchscreen = Touchscreen.current;
-            if (touchscreen == null) return; // safety if no touchscreen present
 
-            if (touchscreen.primaryTouch.press.isPressed)
+            // Zoom with scroll wheel
+            Vector2 scroll = mouse.scroll.ReadValue();
+            if (Mathf.Abs(scroll.y) > 0.01f)
             {
-                var touch = touchscreen.primaryTouch;
+                ApplyZoomDelta(scroll.y); // scale scroll speed
+            }
+        }
 
+        private void HandleTouchInput()
+        {
+            var touchscreen = Touchscreen.current;
+            if (touchscreen == null) return;
+
+            var touches = touchscreen.touches;
+            int touchCount = touches.Count;
+
+            if (touchCount == 1)
+            {
+                var touch = touches[0];
                 if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began)
                 {
-                    lastTouchPosition = touch.position.ReadValue();
                     isDragging = true;
+                    lastTouchPosition = touch.position.ReadValue();
                 }
                 else if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Moved && isDragging)
                 {
@@ -108,14 +135,52 @@ namespace LDraw.Runtime
                 {
                     isDragging = false;
                 }
+                isPinching = false; // reset pinch flag when single touch
             }
+            else if (touchCount == 2)
+            {
+                var touch0 = touches[0];
+                var touch1 = touches[1];
+
+                Vector2 pos0 = touch0.position.ReadValue();
+                Vector2 pos1 = touch1.position.ReadValue();
+
+                float currentDistance = Vector2.Distance(pos0, pos1);
+
+                if (!isPinching)
+                {
+                    isPinching = true;
+                    lastPinchDistance = currentDistance;
+                }
+                else
+                {
+                    float deltaDistance = currentDistance - lastPinchDistance;
+                    lastPinchDistance = currentDistance;
+
+                    ApplyZoomDelta(deltaDistance * 0.1f); // adjust sensitivity
+                }
+                // Reset dragging when pinching
+                isDragging = false;
+            }
+            else
+            {
+                isDragging = false;
+                isPinching = false;
+            }
+        }
+
+        private void HandleInput()
+        {
+        #if UNITY_EDITOR || UNITY_STANDALONE
+            HandleMouseInput();
+        #else
+            HandleTouchInput();
         #endif
         }
 
-
         public void Update()
         {
-            HandleSingleFingerRotation();
+            HandleInput();
         }
 
         public void ShowNextStep()
