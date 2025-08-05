@@ -3,6 +3,7 @@ using UnityEngine;
 using TMPro;
 using Newtonsoft.Json;
 using UnityEngine.InputSystem;
+using System.Linq;
 
 namespace LDraw.Runtime
 {
@@ -111,36 +112,38 @@ namespace LDraw.Runtime
             var touchscreen = Touchscreen.current;
             if (touchscreen == null) return;
 
-            var touches = touchscreen.touches;
-            int touchCount = touches.Count;
+            // Count active touches properly (pressed)
+            var touchesArray = touchscreen.touches.ToArray();
+            var activeTouches = touchesArray.Where(t => t.press.isPressed).ToList();
 
-            if (touchCount == 1)
+            if (activeTouches.Count == 1)
             {
-                var touch = touches[0];
-                if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began)
+                var touch = activeTouches[0];
+                var phase = touch.phase.ReadValue();
+                var pos = touch.position.ReadValue();
+
+                if (phase == UnityEngine.InputSystem.TouchPhase.Began)
                 {
+                    lastTouchPosition = pos;
                     isDragging = true;
-                    lastTouchPosition = touch.position.ReadValue();
                 }
-                else if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Moved && isDragging)
+                else if (phase == UnityEngine.InputSystem.TouchPhase.Moved && isDragging)
                 {
-                    Vector2 currentPosition = touch.position.ReadValue();
-                    Vector2 delta = currentPosition - lastTouchPosition;
-                    lastTouchPosition = currentPosition;
+                    Vector2 delta = pos - lastTouchPosition;
+                    lastTouchPosition = pos;
 
                     ApplyRotationDelta(delta);
                 }
-                else if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Ended || 
-                        touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Canceled)
+                else if (phase == UnityEngine.InputSystem.TouchPhase.Ended || phase == UnityEngine.InputSystem.TouchPhase.Canceled)
                 {
                     isDragging = false;
                 }
-                isPinching = false; // reset pinch flag when single touch
+                isPinching = false;
             }
-            else if (touchCount == 2)
+            else if (activeTouches.Count == 2)
             {
-                var touch0 = touches[0];
-                var touch1 = touches[1];
+                var touch0 = activeTouches[0];
+                var touch1 = activeTouches[1];
 
                 Vector2 pos0 = touch0.position.ReadValue();
                 Vector2 pos1 = touch1.position.ReadValue();
@@ -157,9 +160,9 @@ namespace LDraw.Runtime
                     float deltaDistance = currentDistance - lastPinchDistance;
                     lastPinchDistance = currentDistance;
 
-                    ApplyZoomDelta(deltaDistance * 0.1f); // adjust sensitivity
+                    ApplyZoomDelta(deltaDistance * 0.1f);
                 }
-                // Reset dragging when pinching
+
                 isDragging = false;
             }
             else
