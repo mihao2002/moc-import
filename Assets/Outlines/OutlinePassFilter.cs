@@ -87,6 +87,16 @@ namespace Xenon
             var depthDesc = renderGraph.GetTextureDesc(resourceData.activeDepthTexture);
             Debug.Log("Depth Texture Format: " + depthDesc.format);
 
+            // var depthTextureDesc = new TextureDesc(targetDesc.width, targetDesc.height)
+            // {
+            //     format = GraphicsFormat.D24_UNorm_S8_UInt, // ✅ Valid Metal-compatible depth/stencil format
+            //     clearBuffer = true,
+            //     name = "_OutlineDepth"
+            // };
+
+            // var depthTexture = renderGraph.CreateTexture(depthTextureDesc);
+            // builder.SetRenderAttachmentDepth(depthTexture);
+
             builder.SetRenderAttachmentDepth(resourceData.activeDepthTexture);
             builder.SetRenderFunc<PassData>(ExecutePass);
         }
