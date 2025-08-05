@@ -83,6 +83,10 @@ namespace Xenon
             builder.AllowPassCulling(false);
             builder.UseRendererList(passData.RendererListHandle);
             builder.SetRenderAttachment(destinationHandle, 0);
+
+            var depthDesc = renderGraph.GetTextureDesc(resourceData.activeDepthTexture);
+            Debug.Log("Depth Texture Format: " + depthDesc.format);
+
             builder.SetRenderAttachmentDepth(resourceData.activeDepthTexture);
             builder.SetRenderFunc<PassData>(ExecutePass);
         }
