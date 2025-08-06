@@ -25,6 +25,7 @@ namespace LDraw.Runtime
         private bool isDragging = false;
         private bool isPinching = false;
         private float lastPinchDistance = 0f;
+        private bool suppressSliderCallback = false;
 
         private LDrawFlatStepNavigator navigator;
 
@@ -37,36 +38,29 @@ namespace LDraw.Runtime
                 Debug.LogError("LDrawStepData.json not found in Resources!");
                 return;
             }
-            // var wrapper = JsonUtility.FromJson<LDrawModelStepData>(jsonAsset.text);
-            var data = JsonConvert.DeserializeObject<CombinedData>(jsonAsset.text);
+            var data = JsonConvert.DeserializeObject<StepPackage>(jsonAsset.text);
             var models = data.models;
             var flatSteps = data.flatSteps;
 
-            // var models = wrapper.ToDictionary();
-            // if (models == null || models.Count == 0)
-            // {
-            //     Debug.LogError("No models found in LDrawStepData.json!");
-            //     return;
-            // }
-            // var mainModelName = wrapper.models[0].modelName;
-
             PreInstantiateAllParts(models); // Runtime-specific: instantiate from prefabs
-            // navigator.InitializeNavigation(mainModelName); // Initialize navigation first
 
             slider.minValue = 0;  // your min
-            slider.maxValue = flatSteps.Count - 1; // your max
-            slider.onValueChanged.AddListener(OnSliderChanged);
+            slider.maxValue = flatSteps.Count - 1; // your max            
 
             camera = new LDrawCamera(mainCamera);
             navigator = new LDrawFlatStepNavigator(models, camera, flatSteps);
             slider.value = navigator.CurrentStep;
+            slider.onValueChanged.AddListener(OnSliderChanged);
 
             UpdateNavigationText();
         }
 
         private void OnSliderChanged(float value)
         {
-            navigator.GotoStep((int)value);
+            if (!suppressSliderCallback)
+            {
+                navigator.GotoStep((int)value);
+            }            
         }
 
         private void ApplyRotationDelta(Vector2 delta)
@@ -216,13 +210,17 @@ namespace LDraw.Runtime
 
         public void ShowNextStep()
         {
+            suppressSliderCallback = true;
             slider.value = navigator.ShowNextStep();
+            suppressSliderCallback = false;
             UpdateNavigationText();
         }
 
         public void ShowPreviousStep()
         {
+            suppressSliderCallback = true;
             slider.value = navigator.ShowPreviousStep();
+            suppressSliderCallback = false;
             UpdateNavigationText();
         }
 

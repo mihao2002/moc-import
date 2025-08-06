@@ -10,6 +10,7 @@ namespace LDraw.Runtime
         private List<FlatStep> flatSteps;
         private LDrawCamera ldrawCamera;
         private int currentStep = 0;
+        private int currentModel = -1;
         private int highlightedStep = -1;
         private int shownModel = -1;
        
@@ -77,7 +78,7 @@ namespace LDraw.Runtime
             if (step >= 0 && step < flatSteps.Count)
             {
                 currentStep = step;
-                ShowFlatStep();
+                ShowFlatStep(false);
             }
         }
 
@@ -103,7 +104,7 @@ namespace LDraw.Runtime
             return currentStep;
         }
 
-        private void ShowFlatStep()
+        private void ShowFlatStep(bool animateStep = true)
         {
             Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
 
@@ -124,8 +125,8 @@ namespace LDraw.Runtime
             // Highlight the current step
             HighlightCurrent();
 
-            // Show steps up to and including stepIdx
-            for (int i = 0; i <= stepIdx; i++)
+            // Show steps up to stepIdx-1
+            for (int i = 0; i <= stepIdx-1; i++)
             {
                 modelContainer.ShowStep(i, true);
             }
@@ -148,7 +149,14 @@ namespace LDraw.Runtime
                 {
                     rotation = modelSteps[stepIdx].rotRef == -1 ? defaultRotation : modelSteps[modelSteps[stepIdx].rotRef].rotation;
                 }
-                ldrawCamera.SetCamera(step.center, step.radius, rotation);
+                
+                ldrawCamera.SetCamera(step.center, step.radius, rotation, 
+                    animateStep && (currentModel != -1 && currentModel == shownModel), 
+                    () =>
+                    {
+                        modelContainer.ShowStep(stepIdx, true);
+                    });
+                currentModel = shownModel;
             }
         }
    }

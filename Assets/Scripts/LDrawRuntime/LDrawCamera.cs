@@ -1,10 +1,13 @@
 using UnityEngine;
+using System.Collections;
+using System;
 
 namespace LDraw.Runtime
 {
     public class LDrawCamera
     {
         private readonly Camera cam;
+        private readonly CameraAnimator animator;
 
         private static readonly Quaternion IsometricRotation = Quaternion.AngleAxis(30f, Vector3.right) * 
             Quaternion.AngleAxis(45f, Vector3.up) * 
@@ -14,6 +17,7 @@ namespace LDraw.Runtime
         private Vector3 cameraCenter;
         private float cameraRadius;
         private Vector3 currentRotationEuler;
+        
         // private static readonly Vector3 LookTarget = Vector3.zero;
 
         public LDrawCamera(Camera camera)
@@ -26,6 +30,8 @@ namespace LDraw.Runtime
             RemoveAllLightsUnderCamera();
             CreateDirectionalLight("LDCad_Light1", new Vector3(30, 30, 0));
             CreateDirectionalLight("LDCad_Light2", new Vector3(-30, -30, 0));
+
+            animator = CameraAnimator.AttachTo(camera);
         }
 
         public (Vector3 center, float radius, Vector3 rotationEuler) GetCameraState()
@@ -59,7 +65,7 @@ namespace LDraw.Runtime
             light.shadows = LightShadows.None; // Optional: disable shadows for clarity
         }
 
-        public void SetCamera(Vector3 center, float radius, Vector3? rotation)
+        public void SetCamera(Vector3 center, float radius, Vector3? rotation, bool animate = false, Action onAnimationComplete = null)
         {
             cameraCenter = center;
             cameraRadius = radius;
@@ -76,6 +82,8 @@ namespace LDraw.Runtime
 
             // Use the larger one to ensure full fit
             float distance = Mathf.Max(distanceV, distanceH);
+            Vector3 targetPos;
+            Vector3? up = null;
 
             if (rotation.HasValue)
             {
@@ -92,18 +100,96 @@ namespace LDraw.Runtime
 
                 // Rotate a point from the "behind camera" position (e.g., Vector3.back)
                 Vector3 orbitOffset = stepRotation * (Vector3.forward * distance);
-                Vector3 up = stepRotation * Vector3.down;
+                up = stepRotation * Vector3.down;
 
                 // Set camera position and orientation
-                cam.transform.position = center + orbitOffset;
-                cam.transform.LookAt(center, up);
+                targetPos = center + orbitOffset;
+                //cam.transform.LookAt(center, up);
             }
             else
             {
                 Vector3 direction = cam.transform.forward;
-                cam.transform.position = center - direction * distance; 
+                targetPos = center - direction * distance;
+            }
+
+            if (animate)
+            {
+                animator.AnimateTo(cameraCenter, cam.transform.position, targetPos, cam.transform.up, up ?? cam.transform.up, onAnimationComplete);
+            }
+            else
+            {
+                cam.transform.position = targetPos;
+                if (up != null)
+                {
+                    cam.transform.LookAt(center, up.Value);
+                }
+                onAnimationComplete?.Invoke();
+                
             }
         }
 
+        /// <summary>
+        /// Internal helper MonoBehaviour that animates the camera.
+        /// </summary>
+        internal class CameraAnimator : MonoBehaviour
+        {
+            private Coroutine animationCoroutine;
+            private Camera cam;
+
+            public static CameraAnimator AttachTo(Camera cam)
+            {
+                CameraAnimator anim = cam.GetComponent<CameraAnimator>();
+                if (anim == null)
+                    anim = cam.gameObject.AddComponent<CameraAnimator>();
+                anim.cam = cam;
+                return anim;
+            }
+
+            public void AnimateTo(Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, Action onComplete)
+            {
+                if (animationCoroutine != null)
+                    StopCoroutine(animationCoroutine);
+                animationCoroutine = StartCoroutine(Animate(center, startPos, targetPos, startUp, endUp, 0.5f, onComplete));
+            }
+
+            private IEnumerator Animate(Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, float duration, Action onComplete)
+            {
+                Vector3 startDir = (startPos - center).normalized;
+                Vector3 endDir = (targetPos - center).normalized;
+
+                float startDistance = Vector3.Distance(startPos, center);
+                float endDistance = Vector3.Distance(targetPos, center);
+
+                float elapsed = 0f; 
+
+                while (elapsed < duration)
+                {
+                    float t = elapsed / duration;
+                    float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+                    // Interpolate direction and normalize
+                    Vector3 currentDir = Vector3.Slerp(startDir, endDir, smoothT).normalized;
+
+                    // Interpolate distance
+                    float currentDistance = Mathf.Lerp(startDistance, endDistance, smoothT);
+
+                    // Interpolate up vector
+                    Vector3 currentUp = Vector3.Slerp(startUp, endUp, smoothT).normalized;
+
+                    // Update position and look at center with interpolated up
+                    cam.transform.position = center + currentDir * currentDistance;
+                    cam.transform.LookAt(center, currentUp);
+
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+
+                // Ensure exact final position and rotation
+                cam.transform.position = targetPos;
+                cam.transform.rotation = Quaternion.LookRotation(center - targetPos, endUp);
+
+                onComplete?.Invoke();
+            }
+        }
     }
 }
