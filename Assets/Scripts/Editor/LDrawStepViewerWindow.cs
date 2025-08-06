@@ -365,7 +365,6 @@ namespace LDraw.Editor
                     
                     step.center = modelBounds.center;
                     step.radius = modelBounds.extents.magnitude;
-                    Debug.Log($"Model Step: {kvp.Key} {stepIdx} bounds:{bounds} modelBounds:{modelBounds} center:{step.center} radius:{step.radius}");
 
                     if (isCancelled) yield break;
                 }
