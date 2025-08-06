@@ -13,6 +13,7 @@ namespace LDraw.Runtime
         private int currentModel = -1;
         private int highlightedStep = -1;
         private int shownModel = -1;
+        private bool canNavigate = true;
        
         public LDrawFlatStepNavigator(
             List<RuntimeModelData> models,
@@ -23,6 +24,14 @@ namespace LDraw.Runtime
             this.flatSteps = flatSteps;
             ldrawCamera = mainCamera;
             ShowFlatStep();
+        }
+
+        public bool CanNavigate
+        {
+            get
+            {
+                return canNavigate;
+            }
         }
 
         public int CurrentStep
@@ -150,11 +159,13 @@ namespace LDraw.Runtime
                     rotation = modelSteps[stepIdx].rotRef == -1 ? defaultRotation : modelSteps[modelSteps[stepIdx].rotRef].rotation;
                 }
                 
+                canNavigate = false;
                 ldrawCamera.SetCamera(step.center, step.radius, rotation, 
                     animateStep && (currentModel != -1 && currentModel == shownModel), 
                     () =>
                     {
                         modelContainer.ShowStep(stepIdx, true);
+                        canNavigate = true;
                     });
                 currentModel = shownModel;
             }

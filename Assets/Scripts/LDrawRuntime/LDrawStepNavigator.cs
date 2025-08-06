@@ -55,9 +55,17 @@ namespace LDraw.Runtime
             UpdateNavigationText();
         }
 
+        private bool CanNavigate
+        {
+            get
+            {
+                return navigator.CanNavigate;
+            }            
+        }
+
         private void OnSliderChanged(float value)
         {
-            if (!suppressSliderCallback)
+            if (CanNavigate && !suppressSliderCallback)
             {
                 navigator.GotoStep((int)value);
             }            
@@ -88,7 +96,7 @@ namespace LDraw.Runtime
 
         private void HandleMouseInput()
         {
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            if (camera == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 return;
             }
@@ -126,7 +134,7 @@ namespace LDraw.Runtime
         private void HandleTouchInput()
         {
             var touchscreen = Touchscreen.current;
-            if (touchscreen == null || EventSystem.current == null)
+            if (camera == null || touchscreen == null || EventSystem.current == null)
                 return;
 
             // Only process touches that are not over UI
@@ -205,23 +213,33 @@ namespace LDraw.Runtime
 
         public void Update()
         {
-            HandleInput();
+            if (CanNavigate)
+            {
+                HandleInput();
+            }            
         }
 
         public void ShowNextStep()
         {
-            suppressSliderCallback = true;
-            slider.value = navigator.ShowNextStep();
-            suppressSliderCallback = false;
-            UpdateNavigationText();
+            if (CanNavigate)
+            {
+                suppressSliderCallback = true;
+                slider.value = navigator.ShowNextStep();
+                suppressSliderCallback = false;
+                UpdateNavigationText();                
+            }
+
         }
 
         public void ShowPreviousStep()
         {
-            suppressSliderCallback = true;
-            slider.value = navigator.ShowPreviousStep();
-            suppressSliderCallback = false;
-            UpdateNavigationText();
+            if (CanNavigate)
+            {
+                suppressSliderCallback = true;
+                slider.value = navigator.ShowPreviousStep();
+                suppressSliderCallback = false;
+                UpdateNavigationText();                
+            }
         }
 
         private void UpdateNavigationText()

@@ -71,6 +71,7 @@ namespace LDraw.Runtime
 
         public void SetCamera(Vector3 center, float radius, Vector3? rotation, bool animate = false, Action onAnimationComplete = null)
         {
+            var oldCenter = cameraCenter;
             cameraCenter = center;
             cameraRadius = radius;
 
@@ -118,7 +119,7 @@ namespace LDraw.Runtime
 
             if (animate)
             {
-                animator.AnimateTo(cameraCenter, cam.transform.position, targetPos, cam.transform.up, up ?? cam.transform.up, onAnimationComplete);
+                animator.AnimateTo(oldCenter, cameraCenter, cam.transform.position, targetPos, cam.transform.up, up ?? cam.transform.up, onAnimationComplete);
             }
             else
             {
@@ -149,19 +150,27 @@ namespace LDraw.Runtime
                 return anim;
             }
 
-            public void AnimateTo(Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, Action onComplete)
+            public void AnimateTo(Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, Action onComplete)
             {
                 if (animationCoroutine != null)
+                {
                     StopCoroutine(animationCoroutine);
-                animationCoroutine = StartCoroutine(Animate(center, startPos, targetPos, startUp, endUp, 0.5f, onComplete));
+                }
+
+                float distance = Vector3.Distance(startPos, targetPos);
+                float angle = Vector3.Angle(startUp, endUp);
+
+                float duration = Mathf.Clamp((distance + angle * 0.05f) * 0.2f, 0.2f, 2.0f); // tweak as needed
+                    
+                animationCoroutine = StartCoroutine(Animate(startCenter, center, startPos, targetPos, startUp, endUp, duration, onComplete));
             }
 
-            private IEnumerator Animate(Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, float duration, Action onComplete)
+            private IEnumerator Animate(Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, float duration, Action onComplete)
             {
-                Vector3 startDir = (startPos - center).normalized;
+                Vector3 startDir = (startPos - startCenter).normalized;
                 Vector3 endDir = (targetPos - center).normalized;
 
-                float startDistance = Vector3.Distance(startPos, center);
+                float startDistance = Vector3.Distance(startPos, startCenter);
                 float endDistance = Vector3.Distance(targetPos, center);
 
                 float elapsed = 0f; 
@@ -180,9 +189,11 @@ namespace LDraw.Runtime
                     // Interpolate up vector
                     Vector3 currentUp = Vector3.Slerp(startUp, endUp, smoothT).normalized;
 
+                    Vector3 currentCenter = Vector3.Lerp(startCenter, center, smoothT);
+
                     // Update position and look at center with interpolated up
-                    cam.transform.position = center + currentDir * currentDistance;
-                    cam.transform.LookAt(center, currentUp);
+                    cam.transform.position = currentCenter + currentDir * currentDistance;
+                    cam.transform.LookAt(currentCenter, currentUp);
 
                     elapsed += Time.deltaTime;
                     yield return null;
