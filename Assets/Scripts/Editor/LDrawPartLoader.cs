@@ -33,7 +33,8 @@ namespace LDraw.Editor
                 AssetDatabase.Refresh();
             }
 
-            string meshAssetPath = Path.Combine(meshFolder, meshName + ".asset");
+            var fileName = meshName.Replace('\\', '_');
+            string meshAssetPath = Path.Combine(meshFolder, fileName + ".asset");
 
             // Check if mesh asset already exists to avoid overwriting
             Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshAssetPath);
@@ -104,12 +105,14 @@ namespace LDraw.Editor
             return go;
         }
 
-        private static string FindPartFile(string partId, string partLibraryPath, string unofficialPartLibraryPath)
+        private static string FindPartFile(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths)
         {
             string path = FindPartFileInPath(partId, partLibraryPath);
-            if (path == null)
+            int i=0;
+            while (path == null && i<unofficialPartLibraryPaths.Length)
             {
-                path = FindPartFileInPath(partId, unofficialPartLibraryPath);
+                path = FindPartFileInPath(partId, unofficialPartLibraryPaths[i]);
+                i++;
             }
 
             return path;
@@ -224,9 +227,8 @@ namespace LDraw.Editor
             return combined;
         }
 
-        private static LDrawMesh ParsePartFile(string filePath, string partLibraryPath, string unofficialPartLibraryPath)
+        private static LDrawMesh ParsePartFileLines(string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths)
         {
-            var lines = File.ReadAllLines(filePath);
             var allVertices = new List<Vector3>();
             var allTriangles = new List<int>();
 
@@ -284,7 +286,7 @@ namespace LDraw.Editor
                                 bool isMirrored = MatrixIsMirrored(transform);
                                 transform = Consts.NegateZ * transform * Consts.NegateZ;
 
-                                LDrawMesh ldrawMesh = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPath);
+                                LDrawMesh ldrawMesh = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
                                 if (ldrawMesh != null)
                                 {
                                     //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
@@ -421,8 +423,7 @@ namespace LDraw.Editor
             }
 
             if (allVertices.Count == 0 || allTriangles.Count == 0)
-            {
-                Debug.LogWarning($"No geometry parsed from: {filePath}");
+            {                
                 return null;
             }
 
@@ -435,23 +436,34 @@ namespace LDraw.Editor
             return new LDrawMesh{mesh=mesh, isCW=isCW};
         }
 
-        private static LDrawMesh LoadPartMesh(string partId, string partLibraryPath, string unofficialPartLibraryPath)
+        private static LDrawMesh LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
         {
             if (partCache.ContainsKey(partId))
             {
                 return partCache[partId];
             }
 
-            string datPath = FindPartFile(partId, partLibraryPath, unofficialPartLibraryPath);
-            if (datPath == null)
+            if (lines == null)
             {
-                Debug.LogError($"Part file not found: {partId}");
-                return null;
+                string datPath = FindPartFile(partId, partLibraryPath, unofficialPartLibraryPaths);
+                if (datPath == null)
+                {
+                    Debug.LogError($"Part file not found: {partId}");
+                    return null;
+                }
+
+                lines = File.ReadAllLines(datPath);
             }
 
             try
             {
-                LDrawMesh ldrawMesh = ParsePartFile(datPath, partLibraryPath, unofficialPartLibraryPath);
+                LDrawMesh ldrawMesh = ParsePartFileLines(lines, partLibraryPath, unofficialPartLibraryPaths);
+                if (ldrawMesh == null)
+                {
+                    Debug.LogWarning($"No geometry parsed from: {partId}");
+                    return null;
+                }
+
                 partCache[partId] = ldrawMesh;
 
                 return ldrawMesh;
@@ -463,9 +475,9 @@ namespace LDraw.Editor
             }
         }
 
-        public static LDrawMesh LoadPartFromLibrary(string partId, string partLibraryPath, string unofficialPartLibraryPath)
+        public static LDrawMesh LoadPartFromLibrary(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines = null)
         {
-            LDrawMesh ldrawMesh = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPath);
+            LDrawMesh ldrawMesh = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPaths, lines);
             if (ldrawMesh != null)
             {
                 GameObject go = new GameObject(partId);
@@ -480,7 +492,8 @@ namespace LDraw.Editor
                 string prefabFolder = "Assets/Resources/LDrawPrefabs";
                 if (!Directory.Exists(prefabFolder))
                     Directory.CreateDirectory(prefabFolder);
-                string prefabPath = Path.Combine(prefabFolder, $"{partId}.prefab");
+                var fileName = partId.Replace('\\', '_');
+                string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
                 PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
                 UnityEngine.Object.DestroyImmediate(go);
             }
@@ -679,7 +692,8 @@ namespace LDraw.Editor
             if (!Directory.Exists(prefabFolder))
                 Directory.CreateDirectory(prefabFolder);
 
-            string prefabPath = Path.Combine(prefabFolder, $"{partId}.prefab");
+            var fileName = partId.Replace('\\', '_');
+            string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
             PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
 
             go.SetActive(false);

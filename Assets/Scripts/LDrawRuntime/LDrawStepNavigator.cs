@@ -16,6 +16,7 @@ namespace LDraw.Runtime
 
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
+        public TMP_Text stepNumberText;
         public Camera mainCamera; // Assign in inspector
         public Slider slider;
 
@@ -68,6 +69,7 @@ namespace LDraw.Runtime
             if (CanNavigate && !suppressSliderCallback)
             {
                 navigator.GotoStep((int)value);
+                UpdateNavigationText();
             }            
         }
 
@@ -244,10 +246,20 @@ namespace LDraw.Runtime
 
         private void UpdateNavigationText()
         {
-            if (navigationText != null && navigator != null)
+            if (navigator == null)
+            {
+                return;
+            }
+
+            if (navigationText != null)
             {
                 var (modelName, stepIdx, stepCount) = navigator.GetCurrentStep();
                 navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {stepCount}";
+            }
+
+            if (stepNumberText != null)
+            {
+                stepNumberText.text = $"{navigator.CurrentStep+1}";
             }
         }
 
@@ -269,7 +281,8 @@ namespace LDraw.Runtime
                     var objs = new List<GameObject>();
                     foreach (var part in step.parts)
                     {
-                        GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{part.partId}");
+                        var fileName = part.partId.Replace('\\', '_');
+                        GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{fileName}");
                         if (prefab == null)
                         {
                             Debug.LogWarning($"Missing prefab for part: {part.partId}");

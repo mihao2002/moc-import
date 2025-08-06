@@ -13,7 +13,7 @@ namespace LDraw.Editor
     {
         private string ldrawFilePath = "C:/Users/mihao/OneDrive/Documents/test.ldr";
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
-        private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
+        private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial;C:/Models/Unofficial";
         private LDrawFlatStepNavigator navigator;
         public Camera mainCamera; // Assign in inspector or via UI        
         
@@ -184,7 +184,7 @@ namespace LDraw.Editor
             OnProgressUpdate(0f, "Parsing models...");
             yield return null;
 
-            var models = LDrawParser.ParseModels(ldrawFilePath);
+            (List<RuntimeModelData> models, Dictionary<string, string[]> geometryModels) = LDrawParser.ParseModels(ldrawFilePath);
             if (models.Count == 0)
             {
                 Debug.LogError($"No model at all.");
@@ -263,7 +263,7 @@ namespace LDraw.Editor
                     var step = modelData.steps[stepIdx];
                     foreach (var part in step.parts)
                     {
-                        if (!modelNames.ContainsKey(part.partId))
+                        if (!modelNames.ContainsKey(part.partId) && !geometryModels.ContainsKey(part.partId))
                         {
                             parts.Add(part.partId);
                         }
@@ -305,14 +305,33 @@ namespace LDraw.Editor
             // first load all parts
             var partCount = parts.Count;
             var loadedPartCount = 0f;
+            var unofficeialPaths = unofficialPartLibraryPath.Split(';');
 
             foreach (string partId in parts)
             {
                 OnProgressUpdate(loadedPartCount/partCount, $"Loading part {partId}...");
                 yield return null;
 
-                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficialPartLibraryPath);
+                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths);
                 loadedPartCount++;
+
+                if (isCancelled) yield break;                
+            }
+
+            OnProgressUpdate(0f, "Loading geometry parts...");
+            yield return null;
+
+            // then load geometry models as part
+            var geometryPartCount = geometryModels.Count;
+            var loadedGeometryPartCount = 0f;
+            foreach (var kvp in geometryModels)
+            {
+                var partId = kvp.Key;
+                OnProgressUpdate(loadedGeometryPartCount/geometryPartCount, $"Loading geometry part {partId}...");
+                yield return null;
+
+                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths, kvp.Value);
+                loadedGeometryPartCount++;
 
                 if (isCancelled) yield break;                
             }
