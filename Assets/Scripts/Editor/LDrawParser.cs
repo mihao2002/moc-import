@@ -166,14 +166,7 @@ namespace LDraw.Editor
 
         public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, string outputPath = "Assets/Resources/LDrawStepData.json")
         {
-            // var list = new List<LDraw.Runtime.ModelStepPair>();
-            // foreach (var kvp in models)
-            // {
-            //     list.Add(new LDraw.Runtime.ModelStepPair { modelName = kvp.Key, steps = kvp.Value });
-            // }
-            // var wrapper = new LDraw.Runtime.LDrawModelStepData { models = list };
-            //string json = JsonUtility.ToJson(wrapper, true);
-            var data = new CombinedData{models = models, flatSteps= flatSteps};
+            var data = new StepPackage{models = models, flatSteps= flatSteps};
 
             var settings = new JsonSerializerSettings()
             {

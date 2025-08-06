@@ -7,6 +7,15 @@ using System.Text.RegularExpressions;
 namespace LDraw.Runtime
 {
     [Serializable]
+    public class LDrawPart
+    {
+        public string partId;
+        public Vector3 position;
+        public Quaternion rotation;
+        public Color color;
+    }
+
+    [Serializable]
     public class LDrawStep
     {
         public List<LDrawPart> parts = new List<LDrawPart>();
@@ -19,13 +28,6 @@ namespace LDraw.Runtime
     }
 
     [Serializable]
-    public class FlatStep
-    {
-        public int model; // index of another step whose rotation will be applied in this step, -1 means the default rotation
-        public int modelStepIdx; // always set by editor
-    }
-
-    [Serializable]
     public class RuntimeModelData
     {
         public string modelName;
@@ -34,42 +36,16 @@ namespace LDraw.Runtime
     }   
 
     [Serializable]
-    public class CombinedData
+    public class FlatStep
+    {
+        public int model; // index of another step whose rotation will be applied in this step, -1 means the default rotation
+        public int modelStepIdx; // always set by editor
+    }
+    
+    [Serializable]
+    public class StepPackage
     {
         public List<RuntimeModelData> models;
         public List<FlatStep> flatSteps;
     }  
-
-    [Serializable]
-    public class LDrawPart
-    {
-        public string partId;
-        public Vector3 position;
-        public Quaternion rotation;
-        public Color color;
-    }
-
-    [System.Serializable]
-    public class LDrawModelStepData
-    {
-        public List<ModelStepPair> models;
-        public Dictionary<string, List<LDrawStep>> ToDictionary()
-        {
-            var dict = new Dictionary<string, List<LDrawStep>>();
-            if (models != null)
-            {
-                foreach (var pair in models)
-                {
-                    dict[pair.modelName] = pair.steps;
-                }
-            }
-            return dict;
-        }
-    }
-    [System.Serializable]
-    public class ModelStepPair
-    {
-        public string modelName;
-        public List<LDrawStep> steps;
-    }
 }
