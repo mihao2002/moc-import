@@ -63,6 +63,7 @@
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
     <Compile Include="Assets\Outlines\OutlinePassFilter.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\Consts.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\LDrawFlatStepNavigator.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepHierarchyNavigator.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawCamera.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\ModelContainer.cs" />

@@ -6,38 +6,33 @@ namespace LDraw.Runtime
 {
     public class LDrawStepHierarchyNavigator
     {
-        private Dictionary<string, List<LDrawStep>> models;
-        private List<(string modelName, int stepIndex, int doneSubmodel)> navigationStack = new List<(string, int, int)>();
-        private Dictionary<string, ModelContainer> modelContainers = new Dictionary<string, ModelContainer>();
+        private List<RuntimeModelData> models;
+        private List<(int modelIdx, int stepIndex, int doneSubmodel)> navigationStack = new List<(int, int, int)>();
         private LDrawCamera ldrawCamera;
-        private string mainModelName;
-        private ModelContainer highlightedModel = null;
+        private Dictionary<string, int> modelNames;
+        private int highlightedModel = -1;
         private int highlightedStep = 0;
        
-        public LDrawStepHierarchyNavigator(Dictionary<string, List<LDrawStep>> models, Camera mainCamera)
+        public LDrawStepHierarchyNavigator(List<RuntimeModelData> models, LDrawCamera mainCamera)
         {
             this.models = models;
-            ldrawCamera = new LDrawCamera(mainCamera);
+            modelNames = new Dictionary<string, int>();
+            for (var i=0; i<models.Count; i++)
+            {
+                var model = models[i];
+                modelNames.Add(model.modelName, i);
+            }
+
+            ldrawCamera = mainCamera;
+
+            navigationStack.Clear();
+            AddNextNavigationStackStep(0, 0, 0);
+            ShowHierarchicalStep();
         }
 
         public LDrawCamera GetCamera()
         {
             return ldrawCamera;
-        }
-
-        // Call this method after setting up modelContainers with your own instantiation logic
-        public void InitializeNavigation(string mainModelName)
-        {
-            this.mainModelName = mainModelName;
-            navigationStack.Clear();
-            AddNextNavigationStackStep(mainModelName, 0, 0);
-            ShowHierarchicalStep();
-        }
-
-        // Method to set up modelContainers from instantiated ModelContainer objects (both editor and runtime)
-        public void SetModelContainers(Dictionary<string, ModelContainer> modelContainers)
-        {
-            this.modelContainers = modelContainers;
         }
 
         public void ShowNextStep()
@@ -59,8 +54,8 @@ namespace LDraw.Runtime
         public (string modelName, int stepIndex) GetCurrentStep()
         {
             if (navigationStack.Count == 0) return (null, -1);
-            var (modelName, stepIdx, _) = navigationStack[navigationStack.Count - 1];
-            return (modelName, stepIdx);
+            var (modelIdx, stepIdx, _) = navigationStack[navigationStack.Count - 1];
+            return (models[modelIdx].modelName, stepIdx);
         }
 
         public bool IsAtStart
@@ -92,8 +87,7 @@ namespace LDraw.Runtime
             get
             {
                 return navigationStack.Count == 1
-                    && models.ContainsKey(this.mainModelName)
-                    && navigationStack[0].stepIndex == models[this.mainModelName].Count - 1;
+                    && navigationStack[0].stepIndex == models[0].steps.Count - 1;
             }
         }
 
@@ -102,30 +96,29 @@ namespace LDraw.Runtime
             Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
 
             // Hide all models
-            foreach (var container in modelContainers.Values)
+            foreach (var model in models)
             {
-                container.Show(false);
+                model.container.Show(false);
             }
 
-            if (highlightedModel != null)
+            if (highlightedModel != -1)
             {
-                highlightedModel.HighlightStep(highlightedStep, false);
-                highlightedModel = null;
+                var container = models[highlightedModel].container;
+                container.HighlightStep(highlightedStep, false);
+                highlightedModel = -1;
             }
 
             // Show the current model
             var stackIdx = navigationStack.Count - 1;
-            var (modelName, stepIdx, doneSubmodel) = navigationStack[stackIdx];
-            if (!modelContainers.ContainsKey(modelName)) return;
-            var modelContainer = modelContainers[modelName];
+            var (modelIdx, stepIdx, doneSubmodel) = navigationStack[stackIdx];
+            var modelContainer = models[modelIdx].container;
             modelContainer.Show(true);
 
-            var modelSteps = models[modelName];
-            Debug.Log($"ShowHierarchicalStep {modelName} {modelSteps.Count} {stepIdx} {modelSteps[stepIdx].rotation.HasValue}");
+            var modelSteps = models[modelIdx].steps;
 
             // Highlight the current step
             modelContainer.HighlightStep(stepIdx, true);
-            highlightedModel = modelContainer;
+            highlightedModel = modelIdx;
             highlightedStep = stepIdx;
 
             // Show steps up to and including stepIdx
@@ -153,59 +146,59 @@ namespace LDraw.Runtime
             }
         }
 
-        private void AddNextNavigationStackStep(string model, int step, int doneSubmodel)
+        private void AddNextNavigationStackStep(int modelIdx, int step, int doneSubmodel)
         {
-            var nextParts = models[model][step].parts;
+            var nextParts = models[modelIdx].steps[step].parts;
             var nextModels = new List<LDrawPart>();
             foreach (var p in nextParts)
-                if (models.ContainsKey(p.partId)) nextModels.Add(p);
+                if (modelNames.ContainsKey(p.partId)) nextModels.Add(p);
             if (nextModels.Count > 0)
             {
                 if (doneSubmodel < nextModels.Count)
                 {
-                    navigationStack.Add((model, step, doneSubmodel + 1));
-                    AddNextNavigationStackStep(nextModels[doneSubmodel].partId, 0, 0);
+                    navigationStack.Add((modelIdx, step, doneSubmodel + 1));
+                    AddNextNavigationStackStep(modelNames[nextModels[doneSubmodel].partId], 0, 0);
                 }
                 else
                 {
-                    navigationStack.Add((model, step, doneSubmodel));
+                    navigationStack.Add((modelIdx, step, doneSubmodel));
                 }
             }
             else
             {
-                navigationStack.Add((model, step, 0));
+                navigationStack.Add((modelIdx, step, 0));
             }
         }
 
         private void NextHierarchicalStep()
         {
             if (navigationStack.Count == 0) return;
-            var (currentModel, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
-            var steps = models[currentModel];
+            var (currentModelIdx, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
+            var steps = models[currentModelIdx].steps;
             var step = steps[currentStep];
             var submodels = new List<LDrawPart>();
             foreach (var p in step.parts)
-                if (models.ContainsKey(p.partId)) submodels.Add(p);
+                if (modelNames.ContainsKey(p.partId)) submodels.Add(p);
             if (doneSubmodel == submodels.Count)
             {
                 navigationStack.RemoveAt(navigationStack.Count - 1);
                 if (currentStep + 1 < steps.Count)
                 {
-                    AddNextNavigationStackStep(currentModel, currentStep + 1, 0);
+                    AddNextNavigationStackStep(currentModelIdx, currentStep + 1, 0);
                 }
                 else
                 {
                     if (navigationStack.Count > 0)
                     {
-                        var (parentModel, parentStep, parentDoneSubmodel) = navigationStack[navigationStack.Count - 1];
-                        var parentStepObj = models[parentModel][parentStep];
+                        var (parentModelIdx, parentStep, parentDoneSubmodel) = navigationStack[navigationStack.Count - 1];
+                        var parentStepObj = models[parentModelIdx].steps[parentStep];
                         var parentSubmodels = new List<LDrawPart>();
                         foreach (var p in parentStepObj.parts)
-                            if (models.ContainsKey(p.partId)) parentSubmodels.Add(p);
+                            if (modelNames.ContainsKey(p.partId)) parentSubmodels.Add(p);
                         if (parentDoneSubmodel < parentSubmodels.Count)
                         {
                             navigationStack.RemoveAt(navigationStack.Count - 1);
-                            AddNextNavigationStackStep(parentModel, parentStep, parentDoneSubmodel);
+                            AddNextNavigationStackStep(parentModelIdx, parentStep, parentDoneSubmodel);
                         }
                     }
                 }
@@ -213,30 +206,30 @@ namespace LDraw.Runtime
             else
             {
                 navigationStack.RemoveAt(navigationStack.Count - 1);
-                AddNextNavigationStackStep(currentModel, currentStep, doneSubmodel + 1);
+                AddNextNavigationStackStep(currentModelIdx, currentStep, doneSubmodel + 1);
             }
             ShowHierarchicalStep();
         }
 
-        private void AddPrevNavigationStackStep(string model, int step, int doneSubmodel, bool drillin = true)
+        private void AddPrevNavigationStackStep(int modelIdx, int step, int doneSubmodel, bool drillin = true)
         {
-            var prevModel = models[model];
+            var prevModel = models[modelIdx].steps;
             if (step == -1) step = prevModel.Count - 1;
             var prevParts = prevModel[step].parts;
             var prevModels = new List<LDrawPart>();
             foreach (var p in prevParts)
-                if (models.ContainsKey(p.partId)) prevModels.Add(p);
+                if (modelNames.ContainsKey(p.partId)) prevModels.Add(p);
             if (doneSubmodel == -1) doneSubmodel = prevModels.Count;
             if (prevModels.Count == 0)
             {
-                navigationStack.Add((model, step, doneSubmodel));
+                navigationStack.Add((modelIdx, step, doneSubmodel));
             }
             else
             {
-                navigationStack.Add((model, step, doneSubmodel));
+                navigationStack.Add((modelIdx, step, doneSubmodel));
                 if (drillin)
                 {
-                    AddPrevNavigationStackStep(prevModels[doneSubmodel - 1].partId, -1, -1, false);
+                    AddPrevNavigationStackStep(modelNames[prevModels[doneSubmodel - 1].partId], -1, -1, false);
                 }
             }
         }
@@ -244,32 +237,32 @@ namespace LDraw.Runtime
         private void PrevHierarchicalStep()
         {
             if (navigationStack.Count == 0) return;
-            var (currentModel, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
-            var steps = models[currentModel];
+            var (currentModelIdx, currentStep, doneSubmodel) = navigationStack[navigationStack.Count - 1];
+            var steps = models[currentModelIdx].steps;
             var step = steps[currentStep];
             var submodels = new List<LDrawPart>();
             foreach (var p in step.parts)
-                if (models.ContainsKey(p.partId)) submodels.Add(p);
+                if (modelNames.ContainsKey(p.partId)) submodels.Add(p);
             navigationStack.RemoveAt(navigationStack.Count - 1);
             if (submodels.Count > 0)
             {
                 if (doneSubmodel == submodels.Count)
                 {
-                    AddPrevNavigationStackStep(currentModel, currentStep, doneSubmodel);
+                    AddPrevNavigationStackStep(currentModelIdx, currentStep, doneSubmodel);
                 }
             }
             else
             {
                 if (currentStep > 0)
                 {
-                    AddPrevNavigationStackStep(currentModel, currentStep - 1, -1, false);
+                    AddPrevNavigationStackStep(currentModelIdx, currentStep - 1, -1, false);
                 }
                 else
                 {
                     var idx = navigationStack.Count - 1;
                     while (idx >= 0)
                     {
-                        var (prevModel, prevStep, prevDoneSubmodel) = navigationStack[idx];
+                        var (prevModelIdx, prevStep, prevDoneSubmodel) = navigationStack[idx];
                         if (prevDoneSubmodel > 1 || prevStep > 0)
                         {
                             while (navigationStack.Count > idx)
@@ -278,11 +271,11 @@ namespace LDraw.Runtime
                             }
                             if (prevDoneSubmodel > 1)
                             {
-                                AddPrevNavigationStackStep(prevModel, prevStep, prevDoneSubmodel - 1);
+                                AddPrevNavigationStackStep(prevModelIdx, prevStep, prevDoneSubmodel - 1);
                             }
                             else
                             {
-                                AddPrevNavigationStackStep(prevModel, prevStep - 1, -1, false);
+                                AddPrevNavigationStackStep(prevModelIdx, prevStep - 1, -1, false);
                             }
                             break;
                         }

@@ -4,6 +4,8 @@ using TMPro;
 using Newtonsoft.Json;
 using UnityEngine.InputSystem;
 using System.Linq;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace LDraw.Runtime
 {
@@ -15,6 +17,8 @@ namespace LDraw.Runtime
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public Camera mainCamera; // Assign in inspector
+        public Slider slider;
+
         private LDrawCamera camera;
         private Vector2 lastTouchPosition;
         private Vector2 lastMousePosition;
@@ -22,7 +26,7 @@ namespace LDraw.Runtime
         private bool isPinching = false;
         private float lastPinchDistance = 0f;
 
-        private LDrawStepHierarchyNavigator navigator;
+        private LDrawFlatStepNavigator navigator;
 
         void Start()
         {
@@ -34,22 +38,35 @@ namespace LDraw.Runtime
                 return;
             }
             // var wrapper = JsonUtility.FromJson<LDrawModelStepData>(jsonAsset.text);
-            var wrapper = JsonConvert.DeserializeObject<LDrawModelStepData>(jsonAsset.text);
+            var data = JsonConvert.DeserializeObject<CombinedData>(jsonAsset.text);
+            var models = data.models;
+            var flatSteps = data.flatSteps;
 
-            var models = wrapper.ToDictionary();
-            if (models == null || models.Count == 0)
-            {
-                Debug.LogError("No models found in LDrawStepData.json!");
-                return;
-            }
-            navigator = new LDrawStepHierarchyNavigator(models, mainCamera != null ? mainCamera : Camera.main);
-            camera = navigator.GetCamera();
-            var mainModelName = wrapper.models[0].modelName;
+            // var models = wrapper.ToDictionary();
+            // if (models == null || models.Count == 0)
+            // {
+            //     Debug.LogError("No models found in LDrawStepData.json!");
+            //     return;
+            // }
+            // var mainModelName = wrapper.models[0].modelName;
 
-            PreInstantiateAllParts(); // Runtime-specific: instantiate from prefabs
-            navigator.InitializeNavigation(mainModelName); // Initialize navigation first
+            PreInstantiateAllParts(models); // Runtime-specific: instantiate from prefabs
+            // navigator.InitializeNavigation(mainModelName); // Initialize navigation first
+
+            slider.minValue = 0;  // your min
+            slider.maxValue = flatSteps.Count - 1; // your max
+            slider.onValueChanged.AddListener(OnSliderChanged);
+
+            camera = new LDrawCamera(mainCamera);
+            navigator = new LDrawFlatStepNavigator(models, camera, flatSteps);
+            slider.value = navigator.CurrentStep;
 
             UpdateNavigationText();
+        }
+
+        private void OnSliderChanged(float value)
+        {
+            navigator.GotoStep((int)value);
         }
 
         private void ApplyRotationDelta(Vector2 delta)
@@ -77,6 +94,11 @@ namespace LDraw.Runtime
 
         private void HandleMouseInput()
         {
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
+
             var mouse = Mouse.current;
             if (mouse == null) return;
 
@@ -110,7 +132,13 @@ namespace LDraw.Runtime
         private void HandleTouchInput()
         {
             var touchscreen = Touchscreen.current;
-            if (touchscreen == null) return;
+            if (touchscreen == null || EventSystem.current == null)
+                return;
+
+            // Only process touches that are not over UI
+            var touches = touchscreen.touches
+                .Where(t => t.press.isPressed && !EventSystem.current.IsPointerOverGameObject(t.touchId.ReadValue()))
+                .ToArray();
 
             // Count active touches properly (pressed)
             var touchesArray = touchscreen.touches.ToArray();
@@ -188,13 +216,13 @@ namespace LDraw.Runtime
 
         public void ShowNextStep()
         {
-            navigator.ShowNextStep();
+            slider.value = navigator.ShowNextStep();
             UpdateNavigationText();
         }
 
         public void ShowPreviousStep()
         {
-            navigator.ShowPreviousStep();
+            slider.value = navigator.ShowPreviousStep();
             UpdateNavigationText();
         }
 
@@ -202,29 +230,25 @@ namespace LDraw.Runtime
         {
             if (navigationText != null && navigator != null)
             {
-                var (modelName, stepIdx) = navigator.GetCurrentStep();
-                if (modelName != null && stepIdx >= 0)
-                {
-                    var modelContainers = navigator.GetType().GetField("modelContainers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, ModelContainer>;
-                    if (modelContainers != null && modelContainers.ContainsKey(modelName))
-                    {
-                        var container = modelContainers[modelName];
-                        navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {container.GetStepCount()}";
-                    }
-                }
+                var (modelName, stepIdx, stepCount) = navigator.GetCurrentStep();
+                navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {stepCount}";
             }
         }
 
         // Runtime-specific method to instantiate all parts from prefabs
-        private void PreInstantiateAllParts()
+        private void PreInstantiateAllParts(List<RuntimeModelData> models)
         {
-            var models = navigator.GetType().GetField("models", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, List<LDrawStep>>;
-            var modelContainers = new Dictionary<string, ModelContainer>();
-            
-            foreach (var kvp in models)
+            var modelNames = new Dictionary<string, int>();
+            for (var i=0; i<models.Count; i++)
             {
-                var modelContainer = new ModelContainer(kvp.Key);
-                foreach (var step in kvp.Value)
+                var model = models[i];
+                modelNames.Add(model.modelName, i);
+            }
+
+            foreach (var modelData in models)
+            {
+                var modelContainer = new ModelContainer(modelData.modelName);
+                foreach (var step in modelData.steps)
                 {
                     var objs = new List<GameObject>();
                     foreach (var part in step.parts)
@@ -238,7 +262,7 @@ namespace LDraw.Runtime
                         GameObject go = Object.Instantiate(prefab, parentContainer);
                         go.transform.localPosition = part.position;
                         go.transform.localRotation = part.rotation;
-                        if (!models.ContainsKey(part.partId))
+                        if (!modelNames.ContainsKey(part.partId))
                         {
                             // Regular part: ensure it has a renderer, assign material asset if found
                             var renderer = go.GetComponent<Renderer>();
@@ -259,10 +283,13 @@ namespace LDraw.Runtime
                     }
                     modelContainer.AddStep(objs);
                 }
-                modelContainers[kvp.Key] = modelContainer;
+                modelData.container = modelContainer;
             }
-            // Set the modelContainers in the navigator
-            navigator.SetModelContainers(modelContainers);
+        }
+
+        void OnDestroy()
+        {
+            slider.onValueChanged.RemoveListener(OnSliderChanged);
         }
     }
 }

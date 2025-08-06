@@ -61,8 +61,6 @@ namespace LDraw.Runtime
 
         public void SetCamera(Vector3 center, float radius, Vector3? rotation)
         {
-            Debug.Log($"SetCamera center:{center} radius:{radius} rotation:{rotation}");
-
             cameraCenter = center;
             cameraRadius = radius;
 

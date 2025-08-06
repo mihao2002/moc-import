@@ -2,6 +2,7 @@ Shader "UI/VerticalGradient"
 {
     Properties
     {
+        _MainTex ("Texture", 2D) = "white" {}
         _TopColor ("Top Color", Color) = (1,1,1,1)
         _BottomColor ("Bottom Color", Color) = (0,0,0,1)
     }

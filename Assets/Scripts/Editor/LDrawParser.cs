@@ -14,10 +14,10 @@ namespace LDraw.Editor
         public static string mainModelName = "main.ldr";
 
         // New: Parse all models and their steps, without recursive expansion
-        public static (string, Dictionary<string, List<LDrawStep>>) ParseModels(string filePath)
+        public static List<RuntimeModelData> ParseModels(string filePath)
         {
             var lines = File.ReadAllLines(filePath);
-            var models = new Dictionary<string, List<LDrawStep>>();
+            var models = new List<RuntimeModelData>();
             var modelNames = new HashSet<string>();
             string mainModelName = null;
             string currentModel = mainModelName;
@@ -48,10 +48,13 @@ namespace LDraw.Editor
             foreach (var (name, start, end) in fileSections)
             {
                 if (mainModelName == null) mainModelName = name;
-                models[name] = ParseStepsFromLines(lines, start, end, modelNames);
+                var modelData = new RuntimeModelData{
+                    modelName = name,
+                    steps = ParseStepsFromLines(lines, start, end, modelNames)};
+                models.Add(modelData);
             }
 
-            return (mainModelName, models);
+            return models;
         }
 
         // Helper: Parse a range of lines into steps
@@ -161,15 +164,16 @@ namespace LDraw.Editor
             return steps;
         }
 
-        public static void SaveModelsToJsonAsset(Dictionary<string, List<LDrawStep>> models, string outputPath = "Assets/Resources/LDrawStepData.json")
+        public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, string outputPath = "Assets/Resources/LDrawStepData.json")
         {
-            var list = new List<LDraw.Runtime.ModelStepPair>();
-            foreach (var kvp in models)
-            {
-                list.Add(new LDraw.Runtime.ModelStepPair { modelName = kvp.Key, steps = kvp.Value });
-            }
-            var wrapper = new LDraw.Runtime.LDrawModelStepData { models = list };
+            // var list = new List<LDraw.Runtime.ModelStepPair>();
+            // foreach (var kvp in models)
+            // {
+            //     list.Add(new LDraw.Runtime.ModelStepPair { modelName = kvp.Key, steps = kvp.Value });
+            // }
+            // var wrapper = new LDraw.Runtime.LDrawModelStepData { models = list };
             //string json = JsonUtility.ToJson(wrapper, true);
+            var data = new CombinedData{models = models, flatSteps= flatSteps};
 
             var settings = new JsonSerializerSettings()
             {
@@ -181,7 +185,7 @@ namespace LDraw.Editor
             settings.Converters.Add(new NullableVector3Converter());       
                      
 
-            string json = JsonConvert.SerializeObject(wrapper, Formatting.Indented, settings);
+            string json = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
             File.WriteAllText(outputPath, json);
             Debug.Log($"Saved model step data to {outputPath}");
             AssetDatabase.Refresh();

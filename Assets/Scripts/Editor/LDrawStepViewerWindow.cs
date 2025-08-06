@@ -14,10 +14,8 @@ namespace LDraw.Editor
         private string ldrawFilePath = "C:/Users/mihao/OneDrive/Documents/test.ldr";
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial";
-        private LDrawStepHierarchyNavigator navigator;
-        public Camera mainCamera; // Assign in inspector or via UI
-
-        
+        private LDrawFlatStepNavigator navigator;
+        public Camera mainCamera; // Assign in inspector or via UI        
         
         // Progress tracking
         private bool isLoading = false;
@@ -144,35 +142,29 @@ namespace LDraw.Editor
 
             if (navigator != null)
             {
-                var (currentModel, currentStep) = navigator.GetCurrentStep();
-                if (currentModel != null && currentStep >= 0)
+                var (currentModel, currentStep, stepCount) = navigator.GetCurrentStep();
+
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField($"Model: {currentModel} | Step: {currentStep + 1} / {stepCount}");
+                EditorGUILayout.BeginHorizontal();
+
+                EditorGUI.BeginDisabledGroup(navigator.IsAtStart);
+                if (GUILayout.Button("Previous Step"))
                 {
-                    var modelContainers = navigator.GetType().GetField("modelContainers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(navigator) as Dictionary<string, ModelContainer>;
-                    int totalSteps = 0;
-                    if (modelContainers != null && modelContainers.ContainsKey(currentModel))
-                        totalSteps = modelContainers[currentModel].GetStepCount();
-                    EditorGUILayout.Space();
-                    EditorGUILayout.LabelField($"Model: {currentModel} | Step: {currentStep + 1} / {totalSteps}");
-                    EditorGUILayout.BeginHorizontal();
-
-                    EditorGUI.BeginDisabledGroup(navigator.IsAtStart);
-                    if (GUILayout.Button("Previous Step"))
-                    {
-                        navigator.ShowPreviousStep();
-                        SceneView.RepaintAll();
-                    }
-                    EditorGUI.EndDisabledGroup();
-                    
-                    EditorGUI.BeginDisabledGroup(navigator.IsAtEnd);
-                    if (GUILayout.Button("Next Step"))
-                    {
-                        navigator.ShowNextStep();
-                        SceneView.RepaintAll();
-                    }
-                    EditorGUI.EndDisabledGroup();
-
-                    EditorGUILayout.EndHorizontal();
+                    navigator.ShowPreviousStep();
+                    SceneView.RepaintAll();
                 }
+                EditorGUI.EndDisabledGroup();
+                
+                EditorGUI.BeginDisabledGroup(navigator.IsAtEnd);
+                if (GUILayout.Button("Next Step"))
+                {
+                    navigator.ShowNextStep();
+                    SceneView.RepaintAll();
+                }
+                EditorGUI.EndDisabledGroup();
+
+                EditorGUILayout.EndHorizontal();
             }
         }
 
@@ -192,21 +184,31 @@ namespace LDraw.Editor
             OnProgressUpdate(0f, "Parsing models...");
             yield return null;
 
-            var (mainModelName, models) = LDrawParser.ParseModels(ldrawFilePath);
-
+            var models = LDrawParser.ParseModels(ldrawFilePath);
+            if (models.Count == 0)
+            {
+                Debug.LogError($"No model at all.");
+                yield break;
+            }
+            var mainModelName = models[0].modelName;
+            var allModelNameSet = new HashSet<string>();
+            foreach (var modelData in models)
+            {
+                allModelNameSet.Add(modelData.modelName);
+            }
 
             // Build the model dependency
             var modelDependency = new Dictionary<string, HashSet<string>>();
             var allDependants = new HashSet<string>();
-            foreach (var kvp in models)
+            foreach (var modelData in models)
             {
                 var dependencies = new HashSet<string>();
-                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                for (int stepIdx = 0; stepIdx < modelData.steps.Count; stepIdx++)
                 {
-                    var step = kvp.Value[stepIdx];
+                    var step = modelData.steps[stepIdx];
                     foreach (var part in step.parts)
                     {
-                        if (models.ContainsKey(part.partId))
+                        if (allModelNameSet.Contains(part.partId))
                         {
                             dependencies.Add(part.partId);
                             allDependants.Add(part.partId);
@@ -214,43 +216,54 @@ namespace LDraw.Editor
                     }
                 }
 
-                modelDependency[kvp.Key] = dependencies;
+                modelDependency[modelData.modelName] = dependencies;
             }
 
             // Get all models being used
-            var usedModels = new List<string>{mainModelName};
+            var usedModelNames = new List<string>{mainModelName};
             var index = 0;
-            while (index < usedModels.Count)
+            while (index < usedModelNames.Count)
             {
-                usedModels.AddRange(modelDependency[usedModels[index]]);
+                usedModelNames.AddRange(modelDependency[usedModelNames[index]]);
                 index++;
             }
 
-            var usedModelSet = new HashSet<string>(usedModels);
+            var usedModelSet = new HashSet<string>(usedModelNames);
 
             // Remove all unused models
-            foreach (var key in models.Keys.ToList())
+            var usedModels = new List<RuntimeModelData>();
+            foreach (var modelData in models)
             {
-                if (!usedModelSet.Contains(key))
+                if (usedModelSet.Contains(modelData.modelName))
                 {
-                    models.Remove(key);
-                    modelDependency.Remove(key);
+                    usedModels.Add(modelData);
+                }
+                else
+                {
+                    modelDependency.Remove(modelData.modelName);
                 }
             }
 
-            navigator = new LDrawStepHierarchyNavigator(models, mainCamera);
-            var modelContainers = new Dictionary<string, ModelContainer>();
+            models = usedModels;
+            var modelNames = new Dictionary<string, int>();
+            for (var i=0; i<models.Count; i++)
+            {
+                var model = models[i];
+                modelNames[model.modelName] = i;
+            }
+
+            //var modelContainers = new Dictionary<string, ModelContainer>();
 
             // get model dependency and all parts
             var parts = new HashSet<string>();
-            foreach (var kvp in models)
+            foreach (var modelData in models)
             {
-                for (int stepIdx = 0; stepIdx < kvp.Value.Count; stepIdx++)
+                for (int stepIdx = 0; stepIdx < modelData.steps.Count; stepIdx++)
                 {
-                    var step = kvp.Value[stepIdx];
+                    var step = modelData.steps[stepIdx];
                     foreach (var part in step.parts)
                     {
-                        if (!models.ContainsKey(part.partId))
+                        if (!modelNames.ContainsKey(part.partId))
                         {
                             parts.Add(part.partId);
                         }
@@ -315,7 +328,7 @@ namespace LDraw.Editor
                 OnProgressUpdate(loadedModelCount/modelCount, $"Loading model {modelId}...");
                 yield return null;
 
-                LDrawPartLoader.LoadSubmodelFromLibrary(modelId, models[modelId]);
+                LDrawPartLoader.LoadSubmodelFromLibrary(modelId, models[modelNames[modelId]].steps);
                 loadedModelCount++;
 
                 if (isCancelled) yield break;
@@ -327,16 +340,16 @@ namespace LDraw.Editor
             // construct model steps
             var steppedModelCount = models.Count;
             var loadedSteppedModelCount = 0f;
-            foreach (var kvp in models)
+            foreach (var modelData in models)
             {
-                var steps = models[kvp.Key];
-                var modelContainer = new ModelContainer(kvp.Key);
+                var steps = modelData.steps;
+                var modelContainer = new ModelContainer(modelData.modelName);
                 Bounds modelBounds = new Bounds();
                 bool initialized = false;
 
                 for (int stepIdx = 0; stepIdx < steps.Count; stepIdx++)
                 {
-                    OnProgressUpdate(loadedSteppedModelCount/steppedModelCount, $"Loading model {kvp.Key} step {stepIdx+1}...");
+                    OnProgressUpdate(loadedSteppedModelCount/steppedModelCount, $"Loading model {modelData.modelName} step {stepIdx+1}...");
                     yield return null;
 
                     var step = steps[stepIdx];
@@ -369,20 +382,42 @@ namespace LDraw.Editor
                     if (isCancelled) yield break;
                 }
 
-                modelContainers[kvp.Key] = modelContainer;
+                modelData.container = modelContainer;
                 loadedSteppedModelCount++;                
             }
 
             OnProgressUpdate(1f, "Done");
             yield return null;    
 
-            LDrawParser.SaveModelsToJsonAsset(models);
+            var flatSteps = new List<FlatStep>();
+            GenerateFlatSteps(flatSteps, models, 0, modelNames);
+            LDrawParser.SaveModelsToJsonAsset(models, flatSteps);
 
-            navigator.SetModelContainers(modelContainers);
-            navigator.InitializeNavigation(mainModelName);
+
+            navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera), flatSteps);
 
             LDrawPartLoader.OnProgressUpdate = null;
             isLoading = false;
+        }
+
+        private void GenerateFlatSteps(List<FlatStep> flatSteps, List<RuntimeModelData> models, int modelIndex, Dictionary<string, int> modelNames)
+        {
+            var model = models[modelIndex];
+            var steps = model.steps;
+            for (var i=0; i < steps.Count; i++)
+            {
+                var step = steps[i];
+                foreach (var part in step.parts)
+                {
+                    if (modelNames.ContainsKey(part.partId))
+                    {
+                        GenerateFlatSteps(flatSteps, models, modelNames[part.partId], modelNames);
+                    }
+                }
+
+                var flatStep = new FlatStep{model=modelIndex, modelStepIdx=i};
+                flatSteps.Add(flatStep);
+            }
         }
 
         private IEnumerator<YieldInstruction> loadingRoutine;

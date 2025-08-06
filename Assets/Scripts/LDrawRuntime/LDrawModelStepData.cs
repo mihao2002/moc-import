@@ -19,6 +19,28 @@ namespace LDraw.Runtime
     }
 
     [Serializable]
+    public class FlatStep
+    {
+        public int model; // index of another step whose rotation will be applied in this step, -1 means the default rotation
+        public int modelStepIdx; // always set by editor
+    }
+
+    [Serializable]
+    public class RuntimeModelData
+    {
+        public string modelName;
+        public List<LDrawStep> steps;
+        public ModelContainer container;
+    }   
+
+    [Serializable]
+    public class CombinedData
+    {
+        public List<RuntimeModelData> models;
+        public List<FlatStep> flatSteps;
+    }  
+
+    [Serializable]
     public class LDrawPart
     {
         public string partId;
