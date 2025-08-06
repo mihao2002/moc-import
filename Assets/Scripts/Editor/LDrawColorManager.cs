@@ -18,8 +18,6 @@ namespace LDraw.Editor
         {
             if (IsLoaded) return;
 
-            Debug.Log($"Loading colors from {ldconfigPath}...");
-
             _colorTable.Clear();
             if (!File.Exists(ldconfigPath))
             {
@@ -61,8 +59,6 @@ namespace LDraw.Editor
                     Debug.LogWarning($"Failed to parse line: {line}\n{ex.Message}");
                 }
             }
-
-            Debug.Log($"Loaded {_colorTable.Count} colors from LDConfig.ldr");
         }
 
         public static Color GetColor(int code)

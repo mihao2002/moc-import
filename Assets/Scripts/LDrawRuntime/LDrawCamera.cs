@@ -46,7 +46,11 @@ namespace LDraw.Runtime
                 Light light = child.GetComponent<Light>();
                 if (light != null)
                 {
+#if UNITY_EDITOR
+                    UnityEngine.Object.DestroyImmediate(child.gameObject); // editor mode
+#else
                     GameObject.Destroy(child.gameObject);
+#endif
                 }
             }
         }

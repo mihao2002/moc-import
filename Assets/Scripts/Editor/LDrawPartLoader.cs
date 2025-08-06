@@ -49,27 +49,9 @@ namespace LDraw.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Saved mesh asset at {meshAssetPath}");
             return newMesh;
         }
 
-        // public static Material GetOrCreateMaterial(Color color)
-        // {
-        //     string materialFolder = "Assets/Resources/LDrawMaterials";
-        //     if (!Directory.Exists(materialFolder))
-        //         Directory.CreateDirectory(materialFolder);
-
-        //     string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
-        //     string matPath = Path.Combine(materialFolder, $"Mat_{colorKey}.mat");
-        //     var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
-        //     if (existing != null) return existing;
-
-        //     var mat = new Material(Shader.Find("Standard"));
-        //     mat.color = color;
-        //     AssetDatabase.CreateAsset(mat, matPath);
-        //     AssetDatabase.SaveAssets();
-        //     return mat;
-        // }
         public static Material GetOrCreateMaterial(Color color)
         {
             string materialFolder = "Assets/Resources/LDrawMaterials";
@@ -315,16 +297,13 @@ namespace LDraw.Editor
                                     // Final winding decision
                                     bool invertFace = invertNext ^ isMirrored;
 
-                                    Debug.Log($"{filePath} -> {referencedPartId}-{invertFace}");
                                     // bool invertFace = invertNext ^ mirrorXform ^ !isCW;
                                     Mesh referencedMesh = ldrawMesh.mesh;
 
                                     int vertexOffset = allVertices.Count;
-                                    //Debug.Log(MatrixToString(transform));
                                     foreach (var v in referencedMesh.vertices)
                                     {
                                         Vector3 v2 = transform.MultiplyPoint3x4(v);
-                                        //Vector3 worldPos = NegateZ(v2);
                                         allVertices.Add(v2);
                                     }
 
@@ -503,7 +482,6 @@ namespace LDraw.Editor
                     Directory.CreateDirectory(prefabFolder);
                 string prefabPath = Path.Combine(prefabFolder, $"{partId}.prefab");
                 PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
-                Debug.Log($"Saved Prefab {partId}");
                 UnityEngine.Object.DestroyImmediate(go);
             }
             else
@@ -660,7 +638,6 @@ namespace LDraw.Editor
             var subMeshList = new List<CombineInstance>();
             var materialList = new List<Material>();
 
-            Debug.Log($"Creating prefab for {partId}");
             foreach (var kvp in colorToInstances)
             {                    
                 var material = kvp.Key;
