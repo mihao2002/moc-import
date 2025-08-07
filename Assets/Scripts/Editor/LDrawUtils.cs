@@ -11,7 +11,8 @@ namespace LDraw.Editor
 
         public static Bounds CalculateBounds(GameObject root)
         {
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+            // include inactive children
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
 
             if (renderers.Length == 0)
             {

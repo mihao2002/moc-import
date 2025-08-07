@@ -95,7 +95,6 @@ namespace LDraw.Editor
             else if (submodelCache.ContainsKey(partId))
             {
                 go = GameObject.Instantiate(submodelCache[partId]);
-                go.SetActive(true);
             }
             else
             {

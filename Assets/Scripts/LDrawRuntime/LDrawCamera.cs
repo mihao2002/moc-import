@@ -6,7 +6,9 @@ namespace LDraw.Runtime
 {
     public class LDrawCamera
     {
-        private readonly Camera cam;
+        public static Vector3 DefaultRotation = new Vector3(30f, 45f, 0f);
+
+        public readonly Camera cam;
         private readonly CameraAnimator animator;
 
         private static readonly Quaternion IsometricRotation = Quaternion.AngleAxis(30f, Vector3.right) * 
@@ -32,6 +34,11 @@ namespace LDraw.Runtime
             CreateDirectionalLight("LDCad_Light2", new Vector3(-30, -30, 0));
 
             animator = CameraAnimator.AttachTo(camera);
+        }
+
+        public void Render()
+        {
+            cam.Render();
         }
 
         public (Vector3 center, float radius, Vector3 rotationEuler) GetCameraState()
@@ -65,7 +72,7 @@ namespace LDraw.Runtime
             Light light = lightObj.AddComponent<Light>();
             light.type = LightType.Directional;
             light.color = Color.white;
-            light.intensity = 1f;
+            light.intensity = 0.8f;
             light.shadows = LightShadows.None; // Optional: disable shadows for clarity
         }
 
@@ -86,7 +93,7 @@ namespace LDraw.Runtime
             float distanceH = radius / Mathf.Sin(horizontalFOV / 2f);
 
             // Use the larger one to ensure full fit
-            float distance = Mathf.Max(distanceV, distanceH);
+            float distance = Mathf.Max(distanceV, distanceH) * 1.2f;
             Vector3 targetPos;
             Vector3? up = null;
 

@@ -43,8 +43,10 @@ namespace LDraw.Editor
                 "Assets/Resources/LDrawPrefabs",
                 "Assets/Resources/LDrawMeshes",
                 "Assets/Resources/LDrawMaterials",
+                "Assets/Resources/LDrawImages",
                 "Assets/Resources/LDrawPrefabs.meta",
                 "Assets/Resources/LDrawMaterials.meta",
+                "Assets/Resources/LDrawImages.meta",
             };
 
             foreach (var target in targets)
@@ -356,6 +358,14 @@ namespace LDraw.Editor
             OnProgressUpdate(0f, "Loading model steps...");
             yield return null;
 
+            var resolution = 512;
+            var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.ARGB32);
+            rt.antiAliasing = 8;
+
+            var camGO = new GameObject("PreviewCamera");
+            var cam = camGO.AddComponent<Camera>();
+            var ldrawCamera = CreatePreviewCamera(cam, rt);
+
             // construct model steps
             var steppedModelCount = models.Count;
             var loadedSteppedModelCount = 0f;
@@ -377,6 +387,11 @@ namespace LDraw.Editor
                     foreach (var part in step.parts)
                     {
                         GameObject go = LDrawPartLoader.GetGameObject(part.partId, part.color);
+
+                        go.SetActive(true);
+                        CreateImage(part.partId, part.color, go, ldrawCamera, rt);
+                        go.SetActive(false);
+
                         go.transform.position = part.position;
                         go.transform.rotation = part.rotation;
 
@@ -405,6 +420,9 @@ namespace LDraw.Editor
                 loadedSteppedModelCount++;                
             }
 
+            GameObject.DestroyImmediate(rt);
+            GameObject.DestroyImmediate(camGO);
+
             OnProgressUpdate(1f, "Done");
             yield return null;    
 
@@ -412,11 +430,84 @@ namespace LDraw.Editor
             GenerateFlatSteps(flatSteps, models, 0, modelNames);
             LDrawParser.SaveModelsToJsonAsset(models, flatSteps);
 
-
             navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera), flatSteps);
 
             LDrawPartLoader.OnProgressUpdate = null;
             isLoading = false;
+        }
+
+        private static LDrawCamera CreatePreviewCamera(Camera cam, RenderTexture rt)
+        {
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0, 0, 0, 0); // Transparent
+            cam.orthographic = false;
+            cam.targetTexture = rt;
+            cam.useOcclusionCulling = false;
+            cam.aspect = 1f;
+
+            cam.fieldOfView = 60f;
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 1000f;
+
+            return new LDrawCamera(cam);
+        }
+
+        public static void CreateImage(string partId, Color color, GameObject go, LDrawCamera camera, RenderTexture rt)
+        {
+            string imageFolder = "Assets/Resources/LDrawImages";
+            string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            string matName = $"Mat_{colorKey}";
+            string colorFolder = Path.Combine(imageFolder, matName);
+            var filename = partId.Replace('\\', '_');
+            string imagePath = Path.Combine(colorFolder, $"{filename}.png");
+
+            if (File.Exists(imagePath))
+            {
+                return;
+            }
+
+            if (!Directory.Exists(imageFolder))
+                Directory.CreateDirectory(imageFolder);
+            if (!Directory.Exists(colorFolder))
+                Directory.CreateDirectory(colorFolder);
+
+            var image = GenerateImageFromMeshPrefabTransparent(go, camera, rt);
+            SaveTextureAsPNG(image, imagePath);         
+        }
+
+        public static void SaveTextureAsPNG(Texture2D texture, string fullPath)
+        {
+            byte[] pngData = texture.EncodeToPNG();
+            if (pngData != null)
+            {
+                File.WriteAllBytes(fullPath, pngData);
+                Debug.Log($"Saved image to {fullPath}");
+            }
+            else
+            {
+                Debug.LogError("Failed to encode texture to PNG.");
+            }
+        }
+
+        public static Texture2D GenerateImageFromMeshPrefabTransparent(GameObject go, LDrawCamera camera, RenderTexture rt, int resolution = 512)
+        {
+            Bounds bounds = go.GetComponent<Renderer>().bounds;
+            float radius = bounds.extents.magnitude;
+            var rotation = LDrawCamera.DefaultRotation;
+
+            camera.SetCamera(bounds.center, radius, rotation);
+            camera.Render();
+
+            var oldRT = RenderTexture.active;
+            RenderTexture.active = rt;
+
+            // Read and save texture
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.ARGB32, false);
+            tex.ReadPixels(new Rect(0, 0, resolution, resolution), 0, 0);
+            tex.Apply();
+
+            RenderTexture.active = oldRT;
+            return tex;
         }
 
         private void GenerateFlatSteps(List<FlatStep> flatSteps, List<RuntimeModelData> models, int modelIndex, Dictionary<string, int> modelNames)

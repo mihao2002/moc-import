@@ -115,8 +115,6 @@ namespace LDraw.Runtime
 
         private void ShowFlatStep(bool animateStep = true)
         {
-            Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
-
             // Hide all models
             if (shownModel >= 0)
             {
@@ -156,7 +154,7 @@ namespace LDraw.Runtime
                 var rotation = modelSteps[stepIdx].rotation;
                 if (rotation == null)
                 {
-                    rotation = modelSteps[stepIdx].rotRef == -1 ? defaultRotation : modelSteps[modelSteps[stepIdx].rotRef].rotation;
+                    rotation = modelSteps[stepIdx].rotRef == -1 ? LDrawCamera.DefaultRotation : modelSteps[modelSteps[stepIdx].rotRef].rotation;
                 }
                 
                 canNavigate = false;

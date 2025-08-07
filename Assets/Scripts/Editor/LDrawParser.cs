@@ -74,12 +74,6 @@ namespace LDraw.Editor
         // Helper: Parse a range of lines into steps
         private static List<LDrawStep> ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
         {
-            // Quaternion defaultQuaternion = (Quaternion.AngleAxis(30f, Vector3.right) * 
-            //     Quaternion.AngleAxis(45f, Vector3.up) * 
-            //     Quaternion.LookRotation(Vector3.back, Vector3.down));
-            // Quaternion defaultQuaternion = Quaternion.Euler(30f, 45f, 0f);
-            // Vector3 defaultRotation = new Vector3(30f, 45f, 0f);
-
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
             var hasModelInStep = false;
