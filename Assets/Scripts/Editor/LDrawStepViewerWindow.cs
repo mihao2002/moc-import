@@ -44,9 +44,11 @@ namespace LDraw.Editor
                 "Assets/Resources/LDrawMeshes",
                 "Assets/Resources/LDrawMaterials",
                 "Assets/Resources/LDrawImages",
+                "Assets/Resources/LDrawStepImages",
                 "Assets/Resources/LDrawPrefabs.meta",
                 "Assets/Resources/LDrawMaterials.meta",
                 "Assets/Resources/LDrawImages.meta",
+                "Assets/Resources/LDrawStepImages.meta",
             };
 
             foreach (var target in targets)
@@ -75,10 +77,13 @@ namespace LDraw.Editor
         {
             GUILayout.Label("LDraw Step Viewer", EditorStyles.boldLabel);
 
-            mainCamera = UnityEngine.Object.FindFirstObjectByType<Camera>();
             if (mainCamera == null)
             {
-                EditorUtility.DisplayDialog("Error", "No camera found in the scene! Please add a Camera and assign it as Main Camera.", "OK");
+                mainCamera = UnityEngine.Object.FindFirstObjectByType<Camera>();
+                if (mainCamera == null)
+                {
+                    EditorUtility.DisplayDialog("Error", "No camera found in the scene! Please add a Camera and assign it as Main Camera.", "OK");
+                }
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -355,8 +360,6 @@ namespace LDraw.Editor
                 if (isCancelled) yield break;
             }
 
-            OnProgressUpdate(0f, "Loading model steps...");
-            yield return null;
 
             var resolution = 512;
             var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.ARGB32);
@@ -367,6 +370,9 @@ namespace LDraw.Editor
             var ldrawCamera = CreatePreviewCamera(cam, rt);
 
             // construct model steps
+            OnProgressUpdate(0f, "Loading model steps...");
+            yield return null;
+            
             var steppedModelCount = models.Count;
             var loadedSteppedModelCount = 0f;
             foreach (var modelData in models)
@@ -398,6 +404,9 @@ namespace LDraw.Editor
                         objs.Add(go);
                     }
 
+                    foreach (var go in objs)
+                        go.SetActive(true);
+
                     var stepGO = modelContainer.AddStep(objs);
                     var bounds = LDrawUtils.CalculateBounds(stepGO);
                     if (!initialized)
@@ -418,19 +427,31 @@ namespace LDraw.Editor
 
                 modelData.container = modelContainer;
                 loadedSteppedModelCount++;                
-            }
-
-            GameObject.DestroyImmediate(rt);
-            GameObject.DestroyImmediate(camGO);
-
-            OnProgressUpdate(1f, "Done");
-            yield return null;    
+            }         
 
             var flatSteps = new List<FlatStep>();
             GenerateFlatSteps(flatSteps, models, 0, modelNames);
             LDrawParser.SaveModelsToJsonAsset(models, flatSteps);
 
+            OnProgressUpdate(0f, "Creating model step previews...");
+            yield return null;
+            
+            var previewCount = flatSteps.Count;
+            var previewNavigator = new LDrawFlatStepNavigator(models, ldrawCamera, flatSteps, false);
+            for (var i=0; i<previewCount; i++)
+            {
+                OnProgressUpdate((i+1)/previewCount, $"Creating preview for step {i+1}...");
+                yield return null;
+                CreateStepImage(i, ldrawCamera, rt);
+                previewNavigator.ShowNextStep(false);
+            }
+
             navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera), flatSteps);
+            OnProgressUpdate(1f, "Done");
+            yield return null;    
+
+            GameObject.DestroyImmediate(camGO);
+            GameObject.DestroyImmediate(rt);            
 
             LDrawPartLoader.OnProgressUpdate = null;
             isLoading = false;
@@ -472,6 +493,18 @@ namespace LDraw.Editor
             SaveTextureAsPNG(image, imagePath);         
         }
 
+        public static void CreateStepImage(int step, LDrawCamera camera, RenderTexture rt)
+        {
+            string imageFolder = "Assets/Resources/LDrawStepImages";
+            string imagePath = Path.Combine(imageFolder, $"{step}.png");
+
+            if (!Directory.Exists(imageFolder))
+                Directory.CreateDirectory(imageFolder);
+
+            var image = RenderCamera(camera, rt);
+            SaveTextureAsPNG(image, imagePath);         
+        }
+
         public static void SaveTextureAsPNG(Texture2D texture, string fullPath)
         {
             byte[] bytes = texture.EncodeToPNG();
@@ -491,13 +524,8 @@ namespace LDraw.Editor
             Debug.Log("Saved and imported: " + fullPath);
         }
 
-        public static Texture2D GenerateImageFromMeshPrefabTransparent(GameObject go, LDrawCamera camera, RenderTexture rt, int resolution = 512)
+        private static Texture2D RenderCamera(LDrawCamera camera, RenderTexture rt, int resolution = 512)
         {
-            Bounds bounds = go.GetComponent<Renderer>().bounds;
-            float radius = bounds.extents.magnitude;
-            var rotation = LDrawCamera.DefaultRotation;
-
-            camera.SetCamera(bounds.center, radius, rotation);
             camera.Render();
 
             var oldRT = RenderTexture.active;
@@ -510,6 +538,16 @@ namespace LDraw.Editor
 
             RenderTexture.active = oldRT;
             return tex;
+        }
+
+        public static Texture2D GenerateImageFromMeshPrefabTransparent(GameObject go, LDrawCamera camera, RenderTexture rt)
+        {
+            Bounds bounds = go.GetComponent<Renderer>().bounds;
+            float radius = bounds.extents.magnitude;
+            var rotation = LDrawCamera.DefaultRotation;
+
+            camera.SetCamera(bounds.center, radius, rotation);
+            return RenderCamera(camera, rt);
         }
 
         private void GenerateFlatSteps(List<FlatStep> flatSteps, List<RuntimeModelData> models, int modelIndex, Dictionary<string, int> modelNames)

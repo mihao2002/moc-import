@@ -15,7 +15,7 @@ public class BottomPanelToggle : MonoBehaviour
 
     void Start()
     {
-        paneHeight = Screen.height / 4.0f;
+        paneHeight = Screen.height / 3.0f;
         sidePanel.sizeDelta = new Vector2(sidePanel.sizeDelta.x, paneHeight);
 
         Hide();

@@ -14,15 +14,18 @@ namespace LDraw.Runtime
         private int highlightedStep = -1;
         private int shownModel = -1;
         private bool canNavigate = true;
+        private bool highlight;
        
         public LDrawFlatStepNavigator(
             List<RuntimeModelData> models,
             LDrawCamera mainCamera,
-            List<FlatStep> flatSteps)
+            List<FlatStep> flatSteps,
+            bool highlight = true)
         {
             this.models = models;
             this.flatSteps = flatSteps;
             ldrawCamera = mainCamera;
+            this.highlight = highlight;
             ShowFlatStep();
         }
 
@@ -68,6 +71,8 @@ namespace LDraw.Runtime
 
         public void HighlightCurrent()
         {
+            if (!highlight) return;
+
             if (highlightedStep >= 0)
             {
                 var flatStep = flatSteps[highlightedStep];
@@ -91,26 +96,22 @@ namespace LDraw.Runtime
             }
         }
 
-        public int ShowNextStep()
+        public void ShowNextStep(bool animate = true)
         {
             if (!IsAtEnd)
             {
                 currentStep++;
-                ShowFlatStep();
+                ShowFlatStep(animate);
             }
-
-            return currentStep;
         }
 
-        public int ShowPreviousStep()
+        public void ShowPreviousStep()
         {
             if (!IsAtStart)
             {
                 currentStep--;
                 ShowFlatStep();
             }
-
-            return currentStep;
         }
 
         public List<LDrawPart> GetCurrentParts()

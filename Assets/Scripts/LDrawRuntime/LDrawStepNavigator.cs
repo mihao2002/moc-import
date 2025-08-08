@@ -19,10 +19,11 @@ namespace LDraw.Runtime
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public TMP_Text stepNumberText;
         public Camera mainCamera; // Assign in inspector
-        public Slider slider;
 
         public GameObject gridItemPrefab;  // The prefab for each item
         public Transform gridParent;       // The container with GridLayoutGroup
+        public GameObject stepPrefab;
+        public Transform stepListParent;
 
         private LDrawCamera camera;
         private Vector2 lastTouchPosition;
@@ -30,8 +31,9 @@ namespace LDraw.Runtime
         private bool isDragging = false;
         private bool isPinching = false;
         private float lastPinchDistance = 0f;
-        private bool suppressSliderCallback = false;
+        // private bool suppressSliderCallback = false;
         private Dictionary<string, Sprite> partSpriteDict;
+        private Sprite[] stepSprites;
 
         private LDrawFlatStepNavigator navigator;
 
@@ -50,19 +52,34 @@ namespace LDraw.Runtime
 
             PreInstantiateAllParts(models); // Runtime-specific: instantiate from prefabs
 
-            slider.minValue = 0;  // your min
-            slider.maxValue = flatSteps.Count - 1; // your max            
-
             camera = new LDrawCamera(mainCamera);
             navigator = new LDrawFlatStepNavigator(models, camera, flatSteps);
-            slider.value = navigator.CurrentStep;
-            slider.onValueChanged.AddListener(OnSliderChanged);
 
             partSpriteDict = LoadAllSpritesFromResources();
+            stepSprites = LoadAllStepSpritesFromResources();
 
+            PopulateSteps();
             UpdateNavigationText();
             ShowStepParts();
+        }
 
+        public static Sprite[] LoadAllStepSpritesFromResources()
+        {          
+            Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawStepImages");
+            var result = new Sprite[sprites.Length];
+            foreach (var sprite in sprites)
+            {
+                if (int.TryParse(sprite.name, out int idx))
+                {
+                    result[idx] = sprite;
+                }
+                else
+                {
+                    Debug.LogError($"Invalid step image {sprite.name}");
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -73,10 +90,7 @@ namespace LDraw.Runtime
         {
             var result = new Dictionary<string, Sprite>();
 
-            // Load all sprites under "LDrawImages" folder (including subfolders)
             Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawImages");
-            Debug.LogError($"LoadAllSpritesFromResources count:{sprites.Length}");
-
             foreach (var sprite in sprites)
             {
                 result[sprite.name] = sprite;
@@ -123,16 +137,6 @@ namespace LDraw.Runtime
             get
             {
                 return navigator != null && navigator.CanNavigate;
-            }            
-        }
-
-        private void OnSliderChanged(float value)
-        {
-            if (CanNavigate && !suppressSliderCallback)
-            {
-                navigator.GotoStep((int)value);
-                UpdateNavigationText();
-                ShowStepParts();
             }            
         }
 
@@ -288,9 +292,7 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                suppressSliderCallback = true;
-                slider.value = navigator.ShowNextStep();
-                suppressSliderCallback = false;
+                navigator.ShowNextStep();
                 UpdateNavigationText(); 
                 ShowStepParts();               
             }
@@ -301,9 +303,7 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                suppressSliderCallback = true;
-                slider.value = navigator.ShowPreviousStep();
-                suppressSliderCallback = false;
+                navigator.ShowPreviousStep();
                 UpdateNavigationText();
                 ShowStepParts();                  
             }
@@ -381,6 +381,25 @@ namespace LDraw.Runtime
             }
         }
 
+        private void PopulateSteps()
+        {
+            for (var i=0;i<stepSprites.Length;i++)
+            {
+                // Create new item under the parent
+                GameObject obj = Instantiate(stepPrefab, stepListParent);
+                PartGridItem itemUI = obj.GetComponent<PartGridItem>();
+
+                if (itemUI != null)
+                {
+                    itemUI.SetContent(stepSprites[i], $"{i+1}");
+                }
+                else
+                {
+                    Debug.LogWarning("Step item prefab is missing PartGridItem script.");
+                }
+            }
+        }
+
         /// <summary>
         /// Adds a new item to the grid.
         /// </summary>
@@ -411,12 +430,6 @@ namespace LDraw.Runtime
             {
                 Destroy(child.gameObject);
             }
-        }
-
-
-        void OnDestroy()
-        {
-            slider.onValueChanged.RemoveListener(OnSliderChanged);
         }
     }
 }
