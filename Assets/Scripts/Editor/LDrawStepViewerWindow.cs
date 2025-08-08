@@ -440,7 +440,7 @@ namespace LDraw.Editor
             var previewNavigator = new LDrawFlatStepNavigator(models, ldrawCamera, flatSteps, false);
             for (var i=0; i<previewCount; i++)
             {
-                OnProgressUpdate((i+1)/previewCount, $"Creating preview for step {i+1}...");
+                OnProgressUpdate((i+1.0f)/previewCount, $"Creating preview for step {i+1}...");
                 yield return null;
                 CreateStepImage(i, ldrawCamera, rt);
                 previewNavigator.ShowNextStep(false);
