@@ -457,9 +457,8 @@ namespace LDraw.Editor
             string imageFolder = "Assets/Resources/LDrawImages";
             string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
             string matName = $"Mat_{colorKey}";
-            string colorFolder = Path.Combine(imageFolder, matName);
             var filename = partId.Replace('\\', '_');
-            string imagePath = Path.Combine(colorFolder, $"{filename}.png");
+            string imagePath = Path.Combine(imageFolder, $"{matName}_{filename}.png");
 
             if (File.Exists(imagePath))
             {
@@ -468,8 +467,6 @@ namespace LDraw.Editor
 
             if (!Directory.Exists(imageFolder))
                 Directory.CreateDirectory(imageFolder);
-            if (!Directory.Exists(colorFolder))
-                Directory.CreateDirectory(colorFolder);
 
             var image = GenerateImageFromMeshPrefabTransparent(go, camera, rt);
             SaveTextureAsPNG(image, imagePath);         
@@ -477,16 +474,21 @@ namespace LDraw.Editor
 
         public static void SaveTextureAsPNG(Texture2D texture, string fullPath)
         {
-            byte[] pngData = texture.EncodeToPNG();
-            if (pngData != null)
-            {
-                File.WriteAllBytes(fullPath, pngData);
-                Debug.Log($"Saved image to {fullPath}");
-            }
-            else
-            {
-                Debug.LogError("Failed to encode texture to PNG.");
-            }
+            byte[] bytes = texture.EncodeToPNG();
+
+            // Write the file
+            File.WriteAllBytes(fullPath, bytes);
+
+            // Tell Unity to import it
+            AssetDatabase.ImportAsset(fullPath);
+            
+            // Set import settings to Sprite
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(fullPath);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.SaveAndReimport();
+
+            Debug.Log("Saved and imported: " + fullPath);
         }
 
         public static Texture2D GenerateImageFromMeshPrefabTransparent(GameObject go, LDrawCamera camera, RenderTexture rt, int resolution = 512)

@@ -31,7 +31,7 @@ namespace LDraw.Runtime
         private bool isPinching = false;
         private float lastPinchDistance = 0f;
         private bool suppressSliderCallback = false;
-        private Dictionary<string, Dictionary<string, Sprite>> partSpriteDict;
+        private Dictionary<string, Sprite> partSpriteDict;
 
         private LDrawFlatStepNavigator navigator;
 
@@ -69,8 +69,7 @@ namespace LDraw.Runtime
             slider.value = navigator.CurrentStep;
             slider.onValueChanged.AddListener(OnSliderChanged);
 
-            string path = Application.dataPath + "/Resources/LDrawImages";
-            partSpriteDict = LoadAllSpritesFromDisk(path);
+            partSpriteDict = LoadAllSpritesFromResources();
 
             UpdateNavigationText();
             ShowStepParts();
@@ -78,53 +77,24 @@ namespace LDraw.Runtime
         }
 
         /// <summary>
-        /// Loads all PNGs from folderPath and builds a nested dictionary [subfolder][filename] = Sprite
+        /// Loads all sprites from Resources/LDrawImages folder into nested dictionary [subfolder][filename] = Sprite
+        /// Assumes sprites are imported in Resources/LDrawImages and subfolders.
         /// </summary>
-        public static Dictionary<string, Dictionary<string, Sprite>> LoadAllSpritesFromDisk(string folderPath)
+        public static Dictionary<string, Sprite> LoadAllSpritesFromResources()
         {
-            var result = new Dictionary<string, Dictionary<string, Sprite>>();
+            var result = new Dictionary<string, Sprite>();
 
-            if (!Directory.Exists(folderPath))
+            // Load all sprites under "LDrawImages" folder (including subfolders)
+            Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawImages");
+            Debug.LogError($"LoadAllSpritesFromResources count:{sprites.Length}");
+
+            foreach (var sprite in sprites)
             {
-                Debug.LogWarning("LDraw folder not found: " + folderPath);
-                return result;
-            }
-
-            // Get all .png files recursively
-            string[] pngFiles = Directory.GetFiles(folderPath, "*.png", SearchOption.AllDirectories);
-
-            foreach (string fullFilePath in pngFiles)
-            {
-                string fileName = Path.GetFileNameWithoutExtension(fullFilePath);     // e.g. "23234.dat"
-                string subfolder = Path.GetFileName(Path.GetDirectoryName(fullFilePath)); // e.g. "Mat-1.1.1"
-
-                // Load image bytes
-                byte[] imageBytes = File.ReadAllBytes(fullFilePath);
-                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                if (tex.LoadImage(imageBytes))
-                {
-                    tex.Apply();
-
-                    Sprite sprite = Sprite.Create(
-                        tex,
-                        new Rect(0, 0, tex.width, tex.height),
-                        new Vector2(0.5f, 0.5f)
-                    );
-
-                    if (!result.ContainsKey(subfolder))
-                        result[subfolder] = new Dictionary<string, Sprite>();
-
-                    result[subfolder][fileName] = sprite;
-                }
-                else
-                {
-                    Debug.LogWarning($"Failed to load image: {fullFilePath}");
-                }
+                result[sprite.name] = sprite;
             }
 
             return result;
         }
-
 
         private void ShowStepParts()
         {
@@ -133,26 +103,22 @@ namespace LDraw.Runtime
             var partCounts = new Dictionary<Sprite, int>();
             foreach (var part in parts)
             {
-                string colorKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}";
-                if (partSpriteDict.ContainsKey(colorKey))
+                string spriteKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}_{part.partId.Replace('\\','_')}";
+                if (partSpriteDict.ContainsKey(spriteKey))
                 {
-                    var a = partSpriteDict[colorKey];
-                    if (a.ContainsKey(part.partId))
+                    var sprite = partSpriteDict[spriteKey];
+                    if (partCounts.ContainsKey(sprite))
                     {
-                        var sprite = a[part.partId];
-                        if (partCounts.ContainsKey(sprite))
-                        {
-                            partCounts[sprite]+=1;
-                        }
-                        else
-                        {
-                            partCounts[sprite]=1;
-                        }
-
-                        continue;
+                        partCounts[sprite]+=1;
                     }
-
-                    Debug.LogError($"Can't find part image for {colorKey} {part.partId}");
+                    else
+                    {
+                        partCounts[sprite]=1;
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"Can't find part image for {spriteKey}");
                 }
             }
 
