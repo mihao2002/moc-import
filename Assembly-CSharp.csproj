@@ -60,7 +60,9 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.1.7f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\LDrawRuntime\PartGridItem.cs" />
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
+    <Compile Include="Assets\Scripts\UI\BottomPanelToggle.cs" />
     <Compile Include="Assets\Outlines\OutlinePassFilter.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\Consts.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawFlatStepNavigator.cs" />
@@ -69,6 +71,7 @@
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawModelStepData.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\OrbitCamera.cs" />
     <Compile Include="Assets\Outlines\OutlinePassFinal.cs" />
+    <Compile Include="Assets\Scripts\UI\LeftPanelToggle.cs" />
     <Compile Include="Assets\Scripts\DrawFaceNormals.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawStepNavigator.cs" />
     <Compile Include="Assets\Outlines\OutlineRenderFeature.cs" />

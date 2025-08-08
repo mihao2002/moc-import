@@ -1,30 +1,32 @@
 using UnityEngine;
 using System.Collections;
 
-public class PanelToggle : MonoBehaviour
+public class LeftPanelToggle : MonoBehaviour
 {
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
     public RectTransform arrowImage;     // The arrow image inside the button
     public Camera camera;
 
-    private float collapsedWidth = 300f;  // Width when panel is collapsed
+    private float panelWidth = 300f;  // Width when panel is collapsed
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
 
     void Start()
     {
-        collapsedWidth = Screen.width / 4.0f;
-        float viewportX = collapsedWidth / Screen.width;
-        float viewportWidth = 1.0f - viewportX;
+        panelWidth = Screen.width / 4.0f;
 
-        Shink();
+        Shrink();
+
+        float viewportX = panelWidth / Screen.width;
+        float viewportWidth = 1.0f - viewportX;
         camera.rect = new Rect(viewportX, 0, viewportWidth, 1);
     }
 
-    void Shink()
+    void Shrink()
     {
-        sidePanel.offsetMax = new Vector2(collapsedWidth - Screen.width, sidePanel.offsetMax.y);
+        sidePanel.sizeDelta = new Vector2(panelWidth, sidePanel.sizeDelta.y);
+        //sidePanel.offsetMax = new Vector2(collapsedWidth - Screen.width, sidePanel.offsetMax.y);
     }
 
     // Call this method from the Button onClick event
@@ -32,7 +34,7 @@ public class PanelToggle : MonoBehaviour
     {
         isExpanded = !isExpanded;
 
-        float targetWidth = isExpanded ? 0f : collapsedWidth - Screen.width;
+        float targetWidth = isExpanded ? Screen.width : panelWidth;
 
         // Animate width change (optional)
         StartCoroutine(AnimateWidth(sidePanel, targetWidth));
@@ -41,19 +43,19 @@ public class PanelToggle : MonoBehaviour
         arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
     }
 
-    private IEnumerator AnimateWidth(RectTransform panel, float targetOffsetX)
+    private IEnumerator AnimateWidth(RectTransform panel, float targetWidth)
     {
         float elapsed = 0f;
-        float startOffsetX = sidePanel.offsetMax.x;
+        float startWidth = sidePanel.sizeDelta.x;
 
         while (elapsed < animationDuration)
         {
             elapsed += Time.unscaledDeltaTime;
-            float offsetX = Mathf.Lerp(startOffsetX, targetOffsetX, elapsed / animationDuration);
-            panel.offsetMax = new Vector2(offsetX, sidePanel.offsetMax.y);
+            float width = Mathf.Lerp(startWidth, targetWidth, elapsed / animationDuration);
+            panel.sizeDelta = new Vector2(width, sidePanel.sizeDelta.y);
             yield return null;
         }
 
-        panel.offsetMax = new Vector2(targetOffsetX, panel.offsetMax.y);
+        panel.sizeDelta = new Vector2(targetWidth, sidePanel.sizeDelta.y);
     }
 }

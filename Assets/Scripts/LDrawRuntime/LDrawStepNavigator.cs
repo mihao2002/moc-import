@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 using System.Linq;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System.IO;
 
 namespace LDraw.Runtime
 {
@@ -20,6 +21,9 @@ namespace LDraw.Runtime
         public Camera mainCamera; // Assign in inspector
         public Slider slider;
 
+        public GameObject gridItemPrefab;  // The prefab for each item
+        public Transform gridParent;       // The container with GridLayoutGroup
+
         private LDrawCamera camera;
         private Vector2 lastTouchPosition;
         private Vector2 lastMousePosition;
@@ -27,11 +31,23 @@ namespace LDraw.Runtime
         private bool isPinching = false;
         private float lastPinchDistance = 0f;
         private bool suppressSliderCallback = false;
+        private Dictionary<string, Dictionary<string, Sprite>> partSpriteDict;
 
         private LDrawFlatStepNavigator navigator;
 
         void Start()
         {
+            // Enable auto-rotation
+            Screen.orientation = ScreenOrientation.AutoRotation;
+
+            // Allow only landscape orientations
+            Screen.autorotateToLandscapeLeft = true;
+            Screen.autorotateToLandscapeRight = true;
+
+            // Disable portrait orientations
+            Screen.autorotateToPortrait = false;
+            Screen.autorotateToPortraitUpsideDown = false;
+
             // Load model step data from Resources
             var jsonAsset = Resources.Load<TextAsset>("LDrawStepData");
             if (jsonAsset == null)
@@ -53,14 +69,105 @@ namespace LDraw.Runtime
             slider.value = navigator.CurrentStep;
             slider.onValueChanged.AddListener(OnSliderChanged);
 
+            string path = Application.dataPath + "/Resources/LDrawImages";
+            partSpriteDict = LoadAllSpritesFromDisk(path);
+
             UpdateNavigationText();
+            ShowStepParts();
+
+        }
+
+        /// <summary>
+        /// Loads all PNGs from folderPath and builds a nested dictionary [subfolder][filename] = Sprite
+        /// </summary>
+        public static Dictionary<string, Dictionary<string, Sprite>> LoadAllSpritesFromDisk(string folderPath)
+        {
+            var result = new Dictionary<string, Dictionary<string, Sprite>>();
+
+            if (!Directory.Exists(folderPath))
+            {
+                Debug.LogWarning("LDraw folder not found: " + folderPath);
+                return result;
+            }
+
+            // Get all .png files recursively
+            string[] pngFiles = Directory.GetFiles(folderPath, "*.png", SearchOption.AllDirectories);
+
+            foreach (string fullFilePath in pngFiles)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(fullFilePath);     // e.g. "23234.dat"
+                string subfolder = Path.GetFileName(Path.GetDirectoryName(fullFilePath)); // e.g. "Mat-1.1.1"
+
+                // Load image bytes
+                byte[] imageBytes = File.ReadAllBytes(fullFilePath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (tex.LoadImage(imageBytes))
+                {
+                    tex.Apply();
+
+                    Sprite sprite = Sprite.Create(
+                        tex,
+                        new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f)
+                    );
+
+                    if (!result.ContainsKey(subfolder))
+                        result[subfolder] = new Dictionary<string, Sprite>();
+
+                    result[subfolder][fileName] = sprite;
+                }
+                else
+                {
+                    Debug.LogWarning($"Failed to load image: {fullFilePath}");
+                }
+            }
+
+            return result;
+        }
+
+
+        private void ShowStepParts()
+        {
+            string imageFolder = "Assets/Resources/LDrawImages";
+            var parts = navigator.GetCurrentParts();
+            var partCounts = new Dictionary<Sprite, int>();
+            foreach (var part in parts)
+            {
+                string colorKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}";
+                if (partSpriteDict.ContainsKey(colorKey))
+                {
+                    var a = partSpriteDict[colorKey];
+                    if (a.ContainsKey(part.partId))
+                    {
+                        var sprite = a[part.partId];
+                        if (partCounts.ContainsKey(sprite))
+                        {
+                            partCounts[sprite]+=1;
+                        }
+                        else
+                        {
+                            partCounts[sprite]=1;
+                        }
+
+                        continue;
+                    }
+
+                    Debug.LogError($"Can't find part image for {colorKey} {part.partId}");
+                }
+            }
+
+            ClearGrid();
+            foreach (var kvp in partCounts)
+            {
+                AddItem(kvp.Key, kvp.Value.ToString());
+            }
         }
 
         private bool CanNavigate
         {
             get
             {
-                return navigator.CanNavigate;
+                return navigator != null && navigator.CanNavigate;
             }            
         }
 
@@ -70,6 +177,7 @@ namespace LDraw.Runtime
             {
                 navigator.GotoStep((int)value);
                 UpdateNavigationText();
+                ShowStepParts();
             }            
         }
 
@@ -228,7 +336,8 @@ namespace LDraw.Runtime
                 suppressSliderCallback = true;
                 slider.value = navigator.ShowNextStep();
                 suppressSliderCallback = false;
-                UpdateNavigationText();                
+                UpdateNavigationText(); 
+                ShowStepParts();               
             }
 
         }
@@ -240,7 +349,8 @@ namespace LDraw.Runtime
                 suppressSliderCallback = true;
                 slider.value = navigator.ShowPreviousStep();
                 suppressSliderCallback = false;
-                UpdateNavigationText();                
+                UpdateNavigationText();
+                ShowStepParts();                  
             }
         }
 
@@ -315,6 +425,39 @@ namespace LDraw.Runtime
                 modelData.container = modelContainer;
             }
         }
+
+        /// <summary>
+        /// Adds a new item to the grid.
+        /// </summary>
+        public void AddItem(Sprite icon, string label)
+        {
+            // Create new item under the parent
+            GameObject obj = Instantiate(gridItemPrefab, gridParent);
+
+            // Get the UI script from the prefab
+            PartGridItem itemUI = obj.GetComponent<PartGridItem>();
+
+            if (itemUI != null)
+            {
+                itemUI.SetContent(icon, label);
+            }
+            else
+            {
+                Debug.LogWarning("Grid item prefab is missing PartGridItem script.");
+            }
+        }
+
+        /// <summary>
+        /// Clears all items from the grid.
+        /// </summary>
+        public void ClearGrid()
+        {
+            foreach (Transform child in gridParent)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
 
         void OnDestroy()
         {

@@ -113,6 +113,15 @@ namespace LDraw.Runtime
             return currentStep;
         }
 
+        public List<LDrawPart> GetCurrentParts()
+        {
+            var flatStep = flatSteps[currentStep];
+            var model = models[flatStep.model];
+            var modelSteps = model.steps;
+            var stepIdx = flatStep.modelStepIdx;
+            return modelSteps[stepIdx].parts;
+        }
+
         private void ShowFlatStep(bool animateStep = true)
         {
             // Hide all models
