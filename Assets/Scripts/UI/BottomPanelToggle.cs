@@ -6,16 +6,16 @@ public class BottomPanelToggle : MonoBehaviour
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
     public RectTransform arrowImage;     // The arrow image inside the button
-    public float buttonHalfHeight = 40f;
+    public float paneHeight = 400f;
+    public float buttonHalfHeight = 80f;
 
-    private float paneHeight = 300f;  // Width when panel is collapsed
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
     
 
     void Start()
     {
-        paneHeight = Screen.height / 3.0f;
+        // paneHeight = Screen.height / 3.0f;
         sidePanel.sizeDelta = new Vector2(sidePanel.sizeDelta.x, paneHeight);
 
         Hide();
@@ -26,7 +26,7 @@ public class BottomPanelToggle : MonoBehaviour
         sidePanel.anchoredPosition = new Vector2(sidePanel.anchoredPosition.x, -paneHeight);
       
         // Rotate the arrow 180 degrees around Z to flip it
-        arrowImage.localEulerAngles = new Vector3(0, 0, 90);
+        arrowImage.localEulerAngles = new Vector3(0, 0, 0);
         arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, buttonHalfHeight);
     }
 
@@ -58,7 +58,7 @@ public class BottomPanelToggle : MonoBehaviour
         panel.anchoredPosition = new Vector2(sidePanel.anchoredPosition.x, targetY);
 
         // Rotate the arrow 180 degrees around Z to flip it
-        arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, -90) : new Vector3(0, 0, 90);
+        arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
         arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, isExpanded ? -buttonHalfHeight : buttonHalfHeight);
     }
 }

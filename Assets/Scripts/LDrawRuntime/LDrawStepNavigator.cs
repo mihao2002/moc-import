@@ -391,7 +391,13 @@ namespace LDraw.Runtime
 
                 if (itemUI != null)
                 {
-                    itemUI.SetContent(stepSprites[i], $"{i+1}");
+                    var stepIdx = i;
+                    itemUI.SetContent(stepSprites[i], $"{stepIdx+1}", ()=>
+                    {
+                        navigator.GotoStep(stepIdx);
+                        UpdateNavigationText();
+                        ShowStepParts();  
+                    });
                 }
                 else
                 {
