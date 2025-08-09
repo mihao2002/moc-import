@@ -13,9 +13,6 @@ namespace LDraw.Runtime
 {
     public class LDrawStepNavigator : MonoBehaviour
     {
-        private float minRadius = 0.5f;
-        private float maxRadius = 30f;
-
         public Transform parentContainer; // Where to spawn parts in the scene
         public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public TMP_Text stepNumberText;
@@ -28,16 +25,13 @@ namespace LDraw.Runtime
         public Transform stepListParent;
 
         private LDrawCamera camera;
-        private Vector2 lastTouchPosition;
-        private Vector2 lastMousePosition;
-        private bool isDragging = false;
-        private bool isPinching = false;
-        private float lastPinchDistance = 0f;
+
         // private bool suppressSliderCallback = false;
         private Dictionary<string, Sprite> partSpriteDict;
         private Sprite[] stepSprites;
 
         private LDrawFlatStepNavigator navigator;
+        private InputHandler inputHandler;
 
         void Start()
         {
@@ -56,6 +50,7 @@ namespace LDraw.Runtime
 
             camera = new LDrawCamera(mainCamera);
             navigator = new LDrawFlatStepNavigator(models, camera, flatSteps);
+            inputHandler = new InputHandler(camera);
 
             partSpriteDict = LoadAllSpritesFromResources();
             stepSprites = LoadAllStepSpritesFromResources();
@@ -148,144 +143,16 @@ namespace LDraw.Runtime
             }            
         }
 
-        private void ApplyRotationDelta(Vector2 delta)
+        private void HandleInput()
         {
-            float rotationSpeed = 0.2f;
-
-            (Vector3 center, float radius, Vector3 rotationEuler) = camera.GetCameraState();
-            rotationEuler.y -= delta.x * rotationSpeed;
-            rotationEuler.x -= delta.y * rotationSpeed;
-            //rotationEuler.x = Mathf.Clamp(rotationEuler.x, -89f, 89f);
-
-            camera.SetCamera(center, radius, rotationEuler);
-        }
-
-        private void ApplyZoomDelta(float delta)
-        {
-            var (center, radius, rotationEuler) = camera.GetCameraState();
-
-            radius -= delta;
-            if (radius >= minRadius && radius <= maxRadius)
-            {
-                camera.SetCamera(center, radius, rotationEuler);
-            }
-        }
-
-        private void HandleMouseInput()
-        {
+        #if UNITY_EDITOR || UNITY_STANDALONE
             if (camera == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 return;
             }
-
-            var mouse = Mouse.current;
-            if (mouse == null) return;
-
-            // Rotation with left button drag
-            if (mouse.leftButton.wasPressedThisFrame)
-            {
-                isDragging = true;
-                lastMousePosition = mouse.position.ReadValue();
-            }
-            else if (mouse.leftButton.isPressed && isDragging)
-            {
-                Vector2 currentPos = mouse.position.ReadValue();
-                Vector2 delta = currentPos - lastMousePosition;
-                lastMousePosition = currentPos;
-
-                ApplyRotationDelta(delta);
-            }
-            else if (mouse.leftButton.wasReleasedThisFrame)
-            {
-                isDragging = false;
-            }
-
-            // Zoom with scroll wheel
-            Vector2 scroll = mouse.scroll.ReadValue();
-            if (Mathf.Abs(scroll.y) > 0.01f)
-            {
-                ApplyZoomDelta(scroll.y); // scale scroll speed
-            }
-        }
-
-        private void HandleTouchInput()
-        {
-            var touchscreen = Touchscreen.current;
-            if (camera == null || touchscreen == null || EventSystem.current == null)
-                return;
-
-            // Only process touches that are not over UI
-            var touches = touchscreen.touches
-                .Where(t => t.press.isPressed && !EventSystem.current.IsPointerOverGameObject(t.touchId.ReadValue()))
-                .ToArray();
-
-            // Count active touches properly (pressed)
-            var touchesArray = touchscreen.touches.ToArray();
-            var activeTouches = touchesArray.Where(t => t.press.isPressed).ToList();
-
-            if (activeTouches.Count == 1)
-            {
-                var touch = activeTouches[0];
-                var phase = touch.phase.ReadValue();
-                var pos = touch.position.ReadValue();
-
-                if (phase == UnityEngine.InputSystem.TouchPhase.Began)
-                {
-                    lastTouchPosition = pos;
-                    isDragging = true;
-                }
-                else if (phase == UnityEngine.InputSystem.TouchPhase.Moved && isDragging)
-                {
-                    Vector2 delta = pos - lastTouchPosition;
-                    lastTouchPosition = pos;
-
-                    ApplyRotationDelta(delta);
-                }
-                else if (phase == UnityEngine.InputSystem.TouchPhase.Ended || phase == UnityEngine.InputSystem.TouchPhase.Canceled)
-                {
-                    isDragging = false;
-                }
-                isPinching = false;
-            }
-            else if (activeTouches.Count == 2)
-            {
-                var touch0 = activeTouches[0];
-                var touch1 = activeTouches[1];
-
-                Vector2 pos0 = touch0.position.ReadValue();
-                Vector2 pos1 = touch1.position.ReadValue();
-
-                float currentDistance = Vector2.Distance(pos0, pos1);
-
-                if (!isPinching)
-                {
-                    isPinching = true;
-                    lastPinchDistance = currentDistance;
-                }
-                else
-                {
-                    float deltaDistance = currentDistance - lastPinchDistance;
-                    lastPinchDistance = currentDistance;
-
-                    ApplyZoomDelta(deltaDistance * 0.02f);
-                }
-
-                isDragging = false;
-            }
-            else
-            {
-                isDragging = false;
-                isPinching = false;
-            }
-        }
-
-        private void HandleInput()
-        {
-        #if UNITY_EDITOR || UNITY_STANDALONE
-            HandleMouseInput();
-        #else
-            HandleTouchInput();
         #endif
+
+            inputHandler.HandleInput();
         }
 
         public void Update()

@@ -60,6 +60,7 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.1.7f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\LDrawRuntime\InputHandler.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\PartGridItem.cs" />
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
     <Compile Include="Assets\Scripts\UI\BottomPanelToggle.cs" />

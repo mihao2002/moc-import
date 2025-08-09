@@ -27,6 +27,7 @@ public class LeftPanelToggle : MonoBehaviour
 
     private GameObject previewPart = null;
     private LDrawCamera ldrawCamera;
+    private InputHandler inputHandler;
 
     void Awake()
     {
@@ -39,6 +40,7 @@ public class LeftPanelToggle : MonoBehaviour
         expander.SetActive(false);
 
         ldrawCamera = new LDrawCamera(previewCamera);
+        inputHandler = new InputHandler(ldrawCamera);
     }
 
     private void DestoryPreviewPart()
@@ -146,5 +148,25 @@ public class LeftPanelToggle : MonoBehaviour
 
         panel.sizeDelta = new Vector2(targetWidth, sidePanel.sizeDelta.y);
 
+    }
+
+    private void HandleInput()
+    {
+    // #if UNITY_EDITOR || UNITY_STANDALONE
+    //     if (camera == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
+    //     {
+    //         return;
+    //     }
+    // #endif
+
+        if (isExpanded)
+        {
+            inputHandler.HandleInput();
+        }        
+    }
+
+    public void Update()
+    {
+        HandleInput();
     }
 }
