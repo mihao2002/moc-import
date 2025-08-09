@@ -7,6 +7,7 @@ using System.Linq;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.IO;
+using System;
 
 namespace LDraw.Runtime
 {
@@ -22,6 +23,7 @@ namespace LDraw.Runtime
 
         public GameObject gridItemPrefab;  // The prefab for each item
         public Transform gridParent;       // The container with GridLayoutGroup
+        public LeftPanelToggle leftPaneToggle;
         public GameObject stepPrefab;
         public Transform stepListParent;
 
@@ -104,8 +106,10 @@ namespace LDraw.Runtime
             string imageFolder = "Assets/Resources/LDrawImages";
             var parts = navigator.GetCurrentParts();
             var partCounts = new Dictionary<Sprite, int>();
-            foreach (var part in parts)
+            var partInfo = new Dictionary<Sprite, Tuple<string, Color, int>>();
+            for (var i=0; i<parts.Count; i++)
             {
+                var part = parts[i];
                 string spriteKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}_{part.partId.Replace('\\','_')}";
                 if (partSpriteDict.ContainsKey(spriteKey))
                 {
@@ -117,6 +121,7 @@ namespace LDraw.Runtime
                     else
                     {
                         partCounts[sprite]=1;
+                        partInfo[sprite] = new Tuple<string, Color, int>(part.partId, part.color, i);
                     }
                 }
                 else
@@ -128,8 +133,11 @@ namespace LDraw.Runtime
             ClearGrid();
             foreach (var kvp in partCounts)
             {
-                AddItem(kvp.Key, kvp.Value.ToString());
+                var info = partInfo[kvp.Key];
+                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3);
             }
+
+            leftPaneToggle.SetItemCount(partCounts.Count);
         }
 
         private bool CanNavigate
@@ -353,7 +361,7 @@ namespace LDraw.Runtime
                             Debug.LogWarning($"Missing prefab for part: {part.partId}");
                             continue;
                         }
-                        GameObject go = Object.Instantiate(prefab, parentContainer);
+                        GameObject go = Instantiate(prefab, parentContainer);
                         go.transform.localPosition = part.position;
                         go.transform.localRotation = part.rotation;
                         if (!modelNames.ContainsKey(part.partId))
@@ -409,7 +417,7 @@ namespace LDraw.Runtime
         /// <summary>
         /// Adds a new item to the grid.
         /// </summary>
-        public void AddItem(Sprite icon, string label)
+        public void AddItem(Sprite icon, string label, string partId, Color color, int index)
         {
             // Create new item under the parent
             GameObject obj = Instantiate(gridItemPrefab, gridParent);
@@ -419,7 +427,21 @@ namespace LDraw.Runtime
 
             if (itemUI != null)
             {
-                itemUI.SetContent(icon, label);
+                var go = navigator.GetPartFromCurrentStep(index);
+                itemUI.SetContent(icon, label, ()=>
+                    {
+                        GameObject clone = Instantiate(go);
+
+                        int previewLayer = LayerMask.NameToLayer("Preview");
+                        clone.layer = previewLayer;
+                        clone.SetActive(true);
+
+                        // Optional: reset local transforms
+                        clone.transform.position = Vector3.zero;
+                        clone.transform.rotation = Quaternion.identity;
+                        
+                        leftPaneToggle.PreviewItem(partId, color, clone);
+                    });
             }
             else
             {

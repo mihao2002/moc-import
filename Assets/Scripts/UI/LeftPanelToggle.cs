@@ -1,31 +1,111 @@
 using UnityEngine;
 using System.Collections;
+using UnityEngine.UI;
+using LDraw.Runtime;
 
 public class LeftPanelToggle : MonoBehaviour
 {
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
-    public RectTransform arrowImage;     // The arrow image inside the button
+    // public RectTransform arrowImage;     // The arrow image inside the button
     public Camera camera;
+    public GridLayoutGroup grid;
+    public GameObject partDetail;
+    public GameObject expander;
+    public Camera previewCamera;
+
+    private Color selectedColor = new Color(0.2f, 0.2f, 0.2f, 1f);
 
     private float panelWidth = 300f;  // Width when panel is collapsed
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
+    private float columnWidth;
+    private float columnSpacing;
+    private float padding;
+    private float fixRowCount;
+    private Color buttonColor;
 
-    void Start()
+    private GameObject previewPart = null;
+    private LDrawCamera ldrawCamera;
+
+    void Awake()
     {
-        panelWidth = Screen.width / 4.0f;
+        columnWidth = grid.cellSize.x;
+        columnSpacing = grid.spacing.x;
+        padding = grid.padding.left + grid.padding.right;
+        fixRowCount = grid.constraintCount;
+        // buttonColor = button.colors.normalColor;
+        partDetail.SetActive(false);
+        expander.SetActive(false);
 
-        Shrink();
+        ldrawCamera = new LDrawCamera(previewCamera);
+    }
 
+    private void DestoryPreviewPart()
+    {
+        if (this.previewPart != null)
+        {
+            Destroy(this.previewPart);
+            this.previewPart = null;
+        }
+    }
+
+    public void PreviewItem(string partId, Color color, GameObject previewPart)
+    {
+        Debug.LogError($"PreviewItem {partId} {color} {previewPart.name}");
+
+        DestoryPreviewPart();
+
+        this.previewPart = previewPart;
+
+        Bounds bounds = previewPart.GetComponent<Renderer>().bounds;
+        float radius = bounds.extents.magnitude;
+        var rotation = LDrawCamera.DefaultRotation;
+
+        ldrawCamera.SetCamera(bounds.center, radius, rotation);
+
+        if (!isExpanded)
+        {
+            TogglePanel();
+        }
+    }
+
+    public void SetItemCount(int itemCount)
+    {
+        var columnCount = Mathf.CeilToInt(itemCount / fixRowCount);
+
+        panelWidth = columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding;
         float viewportX = panelWidth / Screen.width;
         float viewportWidth = 1.0f - viewportX;
         camera.rect = new Rect(viewportX, 0, viewportWidth, 1);
+
+        partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth, 0);
+
+        if (isExpanded)
+        {
+            TogglePanel();
+        }
+        else
+        {
+            Shrink();
+        }        
     }
+
+    // void SetButtonColor(Color color)
+    // {
+    //     var colors = button.colors;
+    //     colors.normalColor = color; 
+    //     button.colors = colors;
+    // }
 
     void Shrink()
     {
         sidePanel.sizeDelta = new Vector2(panelWidth, sidePanel.sizeDelta.y);
+        // arrowImage.localEulerAngles = new Vector3(0, 0, -90);
+        // SetButtonColor(buttonColor);
+        partDetail.SetActive(false);
+        expander.SetActive(false);
+        DestoryPreviewPart();
         //sidePanel.offsetMax = new Vector2(collapsedWidth - Screen.width, sidePanel.offsetMax.y);
     }
 
@@ -34,13 +114,21 @@ public class LeftPanelToggle : MonoBehaviour
     {
         isExpanded = !isExpanded;
 
+        if (!isExpanded)
+        {
+            DestoryPreviewPart();
+        }
+
         float targetWidth = isExpanded ? Screen.width : panelWidth;
 
         // Animate width change (optional)
         StartCoroutine(AnimateWidth(sidePanel, targetWidth));
 
         // Rotate the arrow 180 degrees around Z to flip it
-        arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
+        // arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 90) : new Vector3(0, 0, -90);
+        // SetButtonColor(isExpanded ? selectedColor : buttonColor);
+        partDetail.SetActive(isExpanded);
+        expander.SetActive(isExpanded);
     }
 
     private IEnumerator AnimateWidth(RectTransform panel, float targetWidth)
@@ -57,5 +145,6 @@ public class LeftPanelToggle : MonoBehaviour
         }
 
         panel.sizeDelta = new Vector2(targetWidth, sidePanel.sizeDelta.y);
+
     }
 }

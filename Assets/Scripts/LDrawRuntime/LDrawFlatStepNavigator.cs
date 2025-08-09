@@ -123,12 +123,29 @@ namespace LDraw.Runtime
             return modelSteps[stepIdx].parts;
         }
 
+        public GameObject GetPartFromCurrentStep(int index)
+        {
+            var flatStep = flatSteps[currentStep];
+            var model = models[flatStep.model];
+            var modelContainer = model.container;
+            var stepContainer = modelContainer.GetStepContainer(flatStep.modelStepIdx);
+            GameObject childGo = stepContainer.transform.GetChild(index)?.gameObject;
+            if (childGo == null)
+            {
+                Debug.LogError($"Failed to get object {index}");
+                return null;
+            }
+
+            return childGo;
+        }
+
         private void ShowFlatStep(bool animateStep = true)
         {
             // Hide all models
             if (shownModel >= 0)
             {
                 models[shownModel].container.Show(false);
+                shownModel = -1;
             }
 
             var flatStep = flatSteps[currentStep];
