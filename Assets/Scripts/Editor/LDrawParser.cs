@@ -78,6 +78,17 @@ namespace LDraw.Editor
             var currentStep = new LDrawStep();
             var hasModelInStep = false;
             var currentRotationRef = -1;
+
+            for (int i = start; i < end; i++)
+            {
+                var line = lines[i];
+                if (line.StartsWith("3 ") || line.StartsWith("4 "))
+                {
+                    // This is a geometry part
+                    return steps;
+                }
+            }
+
             for (int i = start; i < end; i++)
             {
                 var line = lines[i];
