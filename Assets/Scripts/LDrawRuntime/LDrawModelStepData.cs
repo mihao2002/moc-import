@@ -7,12 +7,19 @@ using System.Text.RegularExpressions;
 namespace LDraw.Runtime
 {
     [Serializable]
+    public class LDrawColor
+    {
+        public Color color;
+        public string name;
+    }
+
+    [Serializable]
     public class LDrawPart
     {
         public string partId;
         public Vector3 position;
         public Quaternion rotation;
-        public Color color;
+        public int color;
     }
 
     [Serializable]
@@ -45,6 +52,8 @@ namespace LDraw.Runtime
     [Serializable]
     public class StepPackage
     {
+        public Dictionary<int, LDrawColor> colors;
+        public Dictionary<string, string> partDescriptions;
         public List<RuntimeModelData> models;
         public List<FlatStep> flatSteps;
     }  

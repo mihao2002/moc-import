@@ -157,8 +157,9 @@ namespace LDraw.Editor
                         mLDraw.SetColumn(3, new Vector4(0, 0, 0, 1));
                         Matrix4x4 RL = Consts.NegateZ * mLDraw * Consts.NegateZ;
                         part.rotation = RL.rotation;
-                        int colorCode = int.Parse(tokens[1]);
-                        part.color = LDrawColorManager.GetColor(colorCode);
+                        // int colorCode = int.Parse(tokens[1]);
+                        // part.color = LDrawColorManager.GetColor(colorCode);
+                        part.color = int.Parse(tokens[1]);
                         currentStep.parts.Add(part);
                     }
                 }
@@ -183,9 +184,12 @@ namespace LDraw.Editor
             return steps;
         }
 
-        public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, string outputPath = "Assets/Resources/LDrawStepData.json")
+        public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, 
+            Dictionary<int, LDrawColor> colors,
+            Dictionary<string, string> partDescriptions,
+            string outputPath = "Assets/Resources/LDrawStepData.json")
         {
-            var data = new StepPackage{models = models, flatSteps= flatSteps};
+            var data = new StepPackage{colors = colors, partDescriptions = partDescriptions, models = models, flatSteps= flatSteps};
 
             var settings = new JsonSerializerSettings()
             {

@@ -129,7 +129,6 @@ GameObject:
   m_Component:
   - component: {fileID: 109761028}
   - component: {fileID: 109761031}
-  - component: {fileID: 109761030}
   - component: {fileID: 109761029}
   m_Layer: 5
   m_Name: Preview Camera
@@ -201,14 +200,6 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!81 &109761030
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 109761027}
-  m_Enabled: 1
 --- !u!20 &109761031
 Camera:
   m_ObjectHideFlags: 0
@@ -4048,7 +4039,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sidePanel: {fileID: 2015060207}
-  camera: {fileID: 367986510}
+  cam: {fileID: 109761031}
   grid: {fileID: 674575177}
   partDetail: {fileID: 1477842137}
   expander: {fileID: 1354874919}

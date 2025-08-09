@@ -28,6 +28,8 @@ namespace LDraw.Runtime
             cam.orthographic = false;
             cam.fieldOfView = 60f;
             cam.transform.rotation = headOnRotation; // IsometricRotation;
+            cameraCenter = Vector3.zero;
+            currentRotationEuler = Vector3.zero;
 
             RemoveAllLightsUnderCamera();
             CreateDirectionalLight("LDCad_Light1", new Vector3(30, 30, 0));

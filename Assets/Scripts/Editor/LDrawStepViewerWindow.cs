@@ -15,6 +15,7 @@ namespace LDraw.Editor
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial;C:/Models/Unofficial";
         private LDrawFlatStepNavigator navigator;
+        
         public Camera mainCamera; // Assign in inspector or via UI        
         
         // Progress tracking
@@ -181,12 +182,13 @@ namespace LDraw.Editor
             isCancelled = false;
 
             string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
-            LDrawColorManager.LoadFromFile(ldconfigPath);
+            var colors = LDrawColorManager.LoadFromFile(ldconfigPath);
+            var partLoader = new LDrawPartLoader(colors);
 
             OnProgressUpdate(0f, "Clearing cache...");
             yield return null;
 
-            LDrawPartLoader.ClearCache();
+            partLoader.ClearCache();
 
             OnProgressUpdate(0f, "Parsing models...");
             yield return null;
@@ -319,7 +321,7 @@ namespace LDraw.Editor
                 OnProgressUpdate(loadedPartCount/partCount, $"Loading part {partId}...");
                 yield return null;
 
-                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths);
+                partLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths);
                 loadedPartCount++;
 
                 if (isCancelled) yield break;                
@@ -337,7 +339,7 @@ namespace LDraw.Editor
                 OnProgressUpdate(loadedGeometryPartCount/geometryPartCount, $"Loading geometry part {partId}...");
                 yield return null;
 
-                LDrawPartLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths, kvp.Value);
+                partLoader.LoadPartFromLibrary(partId, partLibraryPath, unofficeialPaths, kvp.Value);
                 loadedGeometryPartCount++;
 
                 if (isCancelled) yield break;                
@@ -354,7 +356,7 @@ namespace LDraw.Editor
                 OnProgressUpdate(loadedModelCount/modelCount, $"Loading model {modelId}...");
                 yield return null;
 
-                LDrawPartLoader.LoadSubmodelFromLibrary(modelId, models[modelNames[modelId]].steps);
+                partLoader.LoadSubmodelFromLibrary(modelId, models[modelNames[modelId]].steps);
                 loadedModelCount++;
 
                 if (isCancelled) yield break;
@@ -392,10 +394,11 @@ namespace LDraw.Editor
 
                     foreach (var part in step.parts)
                     {
-                        GameObject go = LDrawPartLoader.GetGameObject(part.partId, part.color);
+                        var color = colors[part.color];
+                        GameObject go = partLoader.GetGameObject(part.partId, part.color);
 
                         go.SetActive(true);
-                        CreateImage(part.partId, part.color, go, ldrawCamera, rt);
+                        CreateImage(part.partId, color.color, go, ldrawCamera, rt);
                         go.SetActive(false);
 
                         go.transform.position = part.position;
@@ -431,7 +434,7 @@ namespace LDraw.Editor
 
             var flatSteps = new List<FlatStep>();
             GenerateFlatSteps(flatSteps, models, 0, modelNames);
-            LDrawParser.SaveModelsToJsonAsset(models, flatSteps);
+            LDrawParser.SaveModelsToJsonAsset(models, flatSteps, partLoader.GetUsedColors(), partLoader.GetPartDescriptions());
 
             OnProgressUpdate(0f, "Creating model step previews...");
             yield return null;
@@ -453,7 +456,6 @@ namespace LDraw.Editor
             GameObject.DestroyImmediate(camGO);
             GameObject.DestroyImmediate(rt);            
 
-            LDrawPartLoader.OnProgressUpdate = null;
             isLoading = false;
         }
 

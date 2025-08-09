@@ -15,16 +15,42 @@ namespace LDraw.Editor
         public bool isCW;
     }
 
-    public static class LDrawPartLoader
+    public class LDrawPartLoader
     {
-        private static Dictionary<string, LDrawMesh> partCache = new Dictionary<string, LDrawMesh>();
-        private static Dictionary<string, GameObject> submodelCache = new Dictionary<string, GameObject>();
-        private static Dictionary<string, List<LDrawStep>> models = new Dictionary<string, List<LDrawStep>>();     
-        
-        // Progress callback
-        public static System.Action<float, string> OnProgressUpdate;
+        private Dictionary<int, LDrawColor> colors;
+        private Dictionary<string, (LDrawMesh, string)> partCache = new Dictionary<string, (LDrawMesh, string)>();
+        private Dictionary<string, GameObject> submodelCache = new Dictionary<string, GameObject>();
+        private Dictionary<string, List<LDrawStep>> models = new Dictionary<string, List<LDrawStep>>();
+        private HashSet<int> usedColors;
+        private Dictionary<string, string> partDescriptions;
 
-        public static Mesh SaveMeshAsset(Mesh mesh, string meshName)
+        public LDrawPartLoader(Dictionary<int, LDrawColor> colors)
+        {
+            this.colors = colors;
+            usedColors = new HashSet<int>();
+            partDescriptions = new Dictionary<string, string>();
+        }
+
+        public Dictionary<int, LDrawColor> GetUsedColors()
+        {
+            var usedColorDict = new Dictionary<int, LDrawColor>();
+            foreach (var kvp in colors)
+            {
+                if (usedColors.Contains(kvp.Key))
+                {
+                    usedColorDict[kvp.Key] = kvp.Value;
+                }
+            }
+
+            return usedColorDict;
+        }
+
+        public Dictionary<string, string> GetPartDescriptions()
+        {
+            return partDescriptions;
+        } 
+        
+        public Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
             string meshFolder = "Assets/Resources/LDrawMeshes";
             if (!Directory.Exists(meshFolder))
@@ -53,11 +79,14 @@ namespace LDraw.Editor
             return newMesh;
         }
 
-        public static Material GetOrCreateMaterial(Color color)
+        public Material GetOrCreateMaterial(int colorIdx)
         {
             string materialFolder = "Assets/Resources/LDrawMaterials";
             if (!Directory.Exists(materialFolder))
                 Directory.CreateDirectory(materialFolder);
+
+            var color = colors[colorIdx].color;
+            usedColors.Add(colorIdx);
 
             string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
             string matPath = Path.Combine(materialFolder, $"Mat_{colorKey}.mat");
@@ -79,14 +108,14 @@ namespace LDraw.Editor
             return mat;
         }
 
-        public static GameObject GetGameObject(string partId, Color color)
+        public GameObject GetGameObject(string partId, int color)
         {
             GameObject go = new GameObject(partId);
             if (partCache.ContainsKey(partId))
             {
                 // Add MeshFilter and assign the mesh
                 MeshFilter meshFilter = go.AddComponent<MeshFilter>();
-                meshFilter.mesh = partCache[partId].mesh;
+                meshFilter.mesh = partCache[partId].Item1.mesh;
 
                 // Add MeshRenderer and assign material
                 MeshRenderer meshRenderer = go.AddComponent<MeshRenderer>();
@@ -104,7 +133,7 @@ namespace LDraw.Editor
             return go;
         }
 
-        private static string FindPartFile(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths)
+        private string FindPartFile(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths)
         {
             string path = FindPartFileInPath(partId, partLibraryPath);
             int i=0;
@@ -117,7 +146,7 @@ namespace LDraw.Editor
             return path;
         }
 
-        private static string FindPartFileInPath(string partId, string partLibraryPath)
+        private string FindPartFileInPath(string partId, string partLibraryPath)
         {
             // LDraw folder structure:
             // - parts/ (main parts folder)
@@ -159,7 +188,7 @@ namespace LDraw.Editor
             return null;
         }
 
-        private static Mesh CombineMeshesPreserveSubmeshes(List<CombineInstance> combineInstances)
+        private Mesh CombineMeshesPreserveSubmeshes(List<CombineInstance> combineInstances)
         {
             List<Vector3> allVertices = new List<Vector3>();
             List<Vector3> allNormals = new List<Vector3>();
@@ -226,7 +255,7 @@ namespace LDraw.Editor
             return combined;
         }
 
-        private static LDrawMesh ParsePartFileLines(string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths)
+        private (LDrawMesh, string) ParsePartFileLines(string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths, bool needDescription)
         {
             var allVertices = new List<Vector3>();
             var allTriangles = new List<int>();
@@ -234,10 +263,23 @@ namespace LDraw.Editor
             bool invertNext = false;
             bool isCW = false;
 
+            string description = null;
+            string comment = null;
+
             foreach (var line in lines)
             {
                 string trimmed = line.Trim();
                 if (string.IsNullOrEmpty(trimmed)) continue;
+
+                if (needDescription && description == null && trimmed.StartsWith("0 "))
+                {
+                    description = trimmed.Substring(2);
+                }
+
+                if (!needDescription && trimmed.StartsWith("0 COMMENT") && comment == null)
+                {
+                    comment = trimmed.Substring(10);
+                }
 
                 if (trimmed.StartsWith("0 BFC CERTIFY CW", StringComparison.OrdinalIgnoreCase))
                 {
@@ -285,7 +327,7 @@ namespace LDraw.Editor
                                 bool isMirrored = MatrixIsMirrored(transform);
                                 transform = Consts.NegateZ * transform * Consts.NegateZ;
 
-                                LDrawMesh ldrawMesh = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
+                                (LDrawMesh ldrawMesh, _) = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
                                 if (ldrawMesh != null)
                                 {
                                     //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
@@ -423,7 +465,7 @@ namespace LDraw.Editor
 
             if (allVertices.Count == 0 || allTriangles.Count == 0)
             {                
-                return null;
+                return (null, null);
             }
 
             Mesh mesh = new Mesh();
@@ -432,62 +474,63 @@ namespace LDraw.Editor
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
-            return new LDrawMesh{mesh=mesh, isCW=isCW};
+            return (new LDrawMesh{mesh=mesh, isCW=isCW}, needDescription ? description : comment);
         }
 
-        private static LDrawMesh LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
+        private (LDrawMesh, string) LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
         {
             if (partCache.ContainsKey(partId))
             {
                 return partCache[partId];
             }
 
+            bool needDescription = false;
             if (lines == null)
             {
                 string datPath = FindPartFile(partId, partLibraryPath, unofficialPartLibraryPaths);
                 if (datPath == null)
                 {
                     Debug.LogError($"Part file not found: {partId}");
-                    return null;
+                    return (null, null);
                 }
 
                 lines = File.ReadAllLines(datPath);
+                needDescription = true;
             }
 
             try
             {
-                LDrawMesh ldrawMesh = ParsePartFileLines(lines, partLibraryPath, unofficialPartLibraryPaths);
+                (LDrawMesh ldrawMesh, string description) = ParsePartFileLines(lines, partLibraryPath, unofficialPartLibraryPaths, needDescription);
                 if (ldrawMesh == null)
                 {
                     Debug.LogWarning($"No geometry parsed from: {partId}");
-                    return null;
+                    return (null, null);
                 }
 
-                partCache[partId] = ldrawMesh;
+                partCache[partId] = (ldrawMesh, description);
 
-                return ldrawMesh;
+                return (ldrawMesh, description);
             }
             catch (Exception e)
             {
                 Debug.LogError($"Failed to parse mesh for {partId}: {e.Message}");
-                return null;
+                return (null, null);
             }
         }
 
-        public static LDrawMesh LoadPartFromLibrary(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines = null)
+        public LDrawMesh LoadPartFromLibrary(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines = null)
         {
-            LDrawMesh ldrawMesh = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPaths, lines);
+            (LDrawMesh ldrawMesh, string description) = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPaths, lines);
+            if (description != null)
+            {
+                partDescriptions[partId] = description;
+            }
             if (ldrawMesh != null)
             {
                 GameObject go = new GameObject(partId);
                 Mesh meshAsset = SaveMeshAsset(ldrawMesh.mesh, partId);
                 go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
-                // !!! Why do I have to assign material here???
-                // var meshRenderer = go.GetComponent<MeshRenderer>();
-                // if (meshRenderer == null)
-                //     meshRenderer = go.AddComponent<MeshRenderer>();
-                // meshRenderer.sharedMaterial = GetOrCreateMaterial(Color.white);
-                // Do NOT add MeshRenderer or assign material here for regular parts
+
                 string prefabFolder = "Assets/Resources/LDrawPrefabs";
                 if (!Directory.Exists(prefabFolder))
                     Directory.CreateDirectory(prefabFolder);
@@ -503,7 +546,7 @@ namespace LDraw.Editor
             return ldrawMesh;
         }
 
-        private static Mesh ExtractSubMesh(Mesh sourceMesh, int subMeshIndex)
+        private Mesh ExtractSubMesh(Mesh sourceMesh, int subMeshIndex)
         {
             int[] triangles = sourceMesh.GetTriangles(subMeshIndex);
             Vector3[] sourceVertices = sourceMesh.vertices;
@@ -549,7 +592,7 @@ namespace LDraw.Editor
         }
 
         // Overload: allow passing in-memory models for submodel mesh generation, and indicate if this is a top-level part
-        public static GameObject LoadSubmodelFromLibrary(string partId, List<LDrawStep> steps)
+        public GameObject LoadSubmodelFromLibrary(string partId, List<LDrawStep> steps)
         {
             if (submodelCache.ContainsKey(partId))
             {
@@ -569,7 +612,7 @@ namespace LDraw.Editor
                     if (partCache.ContainsKey(part.partId))
                     {
                         isPart = true;
-                        LDrawMesh subMesh = partCache[part.partId];
+                        LDrawMesh subMesh = partCache[part.partId].Item1;
                         meshCopy = UnityEngine.Object.Instantiate(subMesh.mesh);
                     }
                     else if (submodelCache.ContainsKey(part.partId))
@@ -721,7 +764,7 @@ namespace LDraw.Editor
             return new Vector3(v.x, v.y, -v.z);
         }
 
-        public static void ClearCache()
+        public void ClearCache()
         {
             partCache.Clear();
             foreach (var kvp in submodelCache)

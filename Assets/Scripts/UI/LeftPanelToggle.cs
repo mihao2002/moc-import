@@ -8,7 +8,7 @@ public class LeftPanelToggle : MonoBehaviour
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
     // public RectTransform arrowImage;     // The arrow image inside the button
-    public Camera camera;
+    public Camera cam;
     public GridLayoutGroup grid;
     public GameObject partDetail;
     public GameObject expander;
@@ -52,9 +52,9 @@ public class LeftPanelToggle : MonoBehaviour
         }
     }
 
-    public void PreviewItem(string partId, Color color, GameObject previewPart)
+    public void PreviewItem(string partId, string description, Color color, string colorName, GameObject previewPart)
     {
-        Debug.LogError($"PreviewItem {partId} {color} {previewPart.name}");
+        Debug.LogError($"PreviewItem {partId} {description} {color} {colorName} {previewPart.name}");
 
         DestoryPreviewPart();
 
@@ -79,7 +79,7 @@ public class LeftPanelToggle : MonoBehaviour
         panelWidth = columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding;
         float viewportX = panelWidth / Screen.width;
         float viewportWidth = 1.0f - viewportX;
-        camera.rect = new Rect(viewportX, 0, viewportWidth, 1);
+        cam.rect = new Rect(viewportX, 0, viewportWidth, 1);
 
         partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth, 0);
 
@@ -152,13 +152,6 @@ public class LeftPanelToggle : MonoBehaviour
 
     private void HandleInput()
     {
-    // #if UNITY_EDITOR || UNITY_STANDALONE
-    //     if (camera == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
-    //     {
-    //         return;
-    //     }
-    // #endif
-
         if (isExpanded)
         {
             inputHandler.HandleInput();

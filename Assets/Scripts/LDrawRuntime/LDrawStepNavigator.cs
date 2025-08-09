@@ -24,7 +24,7 @@ namespace LDraw.Runtime
         public GameObject stepPrefab;
         public Transform stepListParent;
 
-        private LDrawCamera camera;
+        private LDrawCamera cam;
 
         // private bool suppressSliderCallback = false;
         private Dictionary<string, Sprite> partSpriteDict;
@@ -32,6 +32,8 @@ namespace LDraw.Runtime
 
         private LDrawFlatStepNavigator navigator;
         private InputHandler inputHandler;
+        private Dictionary<int, LDrawColor> colors;
+        private Dictionary<string, string> partDescriptions;
 
         void Start()
         {
@@ -44,13 +46,15 @@ namespace LDraw.Runtime
             }
             var data = JsonConvert.DeserializeObject<StepPackage>(jsonAsset.text);
             var models = data.models;
+            colors = data.colors;
+            partDescriptions = data.partDescriptions;
             var flatSteps = data.flatSteps;
 
-            PreInstantiateAllParts(models); // Runtime-specific: instantiate from prefabs
+            PreInstantiateAllParts(models, colors); // Runtime-specific: instantiate from prefabs
 
-            camera = new LDrawCamera(mainCamera);
-            navigator = new LDrawFlatStepNavigator(models, camera, flatSteps);
-            inputHandler = new InputHandler(camera);
+            cam = new LDrawCamera(mainCamera);
+            navigator = new LDrawFlatStepNavigator(models, cam, flatSteps);
+            inputHandler = new InputHandler(cam);
 
             partSpriteDict = LoadAllSpritesFromResources();
             stepSprites = LoadAllStepSpritesFromResources();
@@ -98,14 +102,14 @@ namespace LDraw.Runtime
 
         private void ShowStepParts()
         {
-            string imageFolder = "Assets/Resources/LDrawImages";
             var parts = navigator.GetCurrentParts();
             var partCounts = new Dictionary<Sprite, int>();
-            var partInfo = new Dictionary<Sprite, Tuple<string, Color, int>>();
+            var partInfo = new Dictionary<Sprite, Tuple<string, string, Color, string, int>>();
             for (var i=0; i<parts.Count; i++)
             {
                 var part = parts[i];
-                string spriteKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}_{part.partId.Replace('\\','_')}";
+                var color = colors[part.color];
+                string spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{part.partId.Replace('\\','_')}";
                 if (partSpriteDict.ContainsKey(spriteKey))
                 {
                     var sprite = partSpriteDict[spriteKey];
@@ -116,7 +120,8 @@ namespace LDraw.Runtime
                     else
                     {
                         partCounts[sprite]=1;
-                        partInfo[sprite] = new Tuple<string, Color, int>(part.partId, part.color, i);
+                        var description = partDescriptions.ContainsKey(part.partId) ? partDescriptions[part.partId] : null;
+                        partInfo[sprite] = new Tuple<string, string, Color, string, int>(part.partId, description, color.color, color.name, i);
                     }
                 }
                 else
@@ -129,7 +134,7 @@ namespace LDraw.Runtime
             foreach (var kvp in partCounts)
             {
                 var info = partInfo[kvp.Key];
-                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3);
+                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3, info.Item4, info.Item5);
             }
 
             leftPaneToggle.SetItemCount(partCounts.Count);
@@ -146,7 +151,7 @@ namespace LDraw.Runtime
         private void HandleInput()
         {
         #if UNITY_EDITOR || UNITY_STANDALONE
-            if (camera == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
+            if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 return;
             }
@@ -204,7 +209,7 @@ namespace LDraw.Runtime
         }
 
         // Runtime-specific method to instantiate all parts from prefabs
-        private void PreInstantiateAllParts(List<RuntimeModelData> models)
+        private void PreInstantiateAllParts(List<RuntimeModelData> models, Dictionary<int, LDrawColor> colors)
         {
             var modelNames = new Dictionary<string, int>();
             for (var i=0; i<models.Count; i++)
@@ -237,7 +242,8 @@ namespace LDraw.Runtime
                             var renderer = go.GetComponent<Renderer>();
                             if (renderer == null)
                                 renderer = go.AddComponent<MeshRenderer>();
-                            string colorKey = $"Mat_{part.color.r:F3}_{part.color.g:F3}_{part.color.b:F3}";
+                            var color = colors[part.color].color;
+                            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
                             var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
                             if (mat != null)
                             {
@@ -284,7 +290,7 @@ namespace LDraw.Runtime
         /// <summary>
         /// Adds a new item to the grid.
         /// </summary>
-        public void AddItem(Sprite icon, string label, string partId, Color color, int index)
+        public void AddItem(Sprite icon, string label, string partId, string description, Color color, string colorName, int index)
         {
             // Create new item under the parent
             GameObject obj = Instantiate(gridItemPrefab, gridParent);
@@ -307,7 +313,7 @@ namespace LDraw.Runtime
                         clone.transform.position = Vector3.zero;
                         clone.transform.rotation = Quaternion.identity;
                         
-                        leftPaneToggle.PreviewItem(partId, color, clone);
+                        leftPaneToggle.PreviewItem(partId, description, color, colorName, clone);
                     });
             }
             else
