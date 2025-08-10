@@ -34,6 +34,7 @@ namespace LDraw.Runtime
         private InputHandler inputHandler;
         private Dictionary<int, LDrawColor> colors;
         private Dictionary<string, string> partDescriptions;
+        private HashSet<string> modelNames;
 
         void Start()
         {
@@ -48,6 +49,7 @@ namespace LDraw.Runtime
             var models = data.models;
             colors = data.colors;
             partDescriptions = data.partDescriptions;
+            modelNames = new HashSet<string>(models.Select(m=>m.modelName));
             var flatSteps = data.flatSteps;
 
             PreInstantiateAllParts(models, colors); // Runtime-specific: instantiate from prefabs
@@ -104,12 +106,22 @@ namespace LDraw.Runtime
         {
             var parts = navigator.GetCurrentParts();
             var partCounts = new Dictionary<Sprite, int>();
-            var partInfo = new Dictionary<Sprite, Tuple<string, string, Color, string, int>>();
+            var partInfo = new Dictionary<Sprite, Tuple<string, string, string, int>>();
             for (var i=0; i<parts.Count; i++)
-            {
+            {                
                 var part = parts[i];
-                var color = colors[part.color];
-                string spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{part.partId.Replace('\\','_')}";
+                var isModel = modelNames.Contains(part.partId);
+                string spriteKey = $"{part.partId.Replace('\\','_')}";
+                string colorName = null;
+                string id = null;
+                if (!isModel)
+                {
+                    var color = colors[part.color];
+                    colorName = color.name;
+                    id = Path.GetFileNameWithoutExtension(part.partId);
+                    spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{spriteKey}";
+                }
+
                 if (partSpriteDict.ContainsKey(spriteKey))
                 {
                     var sprite = partSpriteDict[spriteKey];
@@ -121,7 +133,7 @@ namespace LDraw.Runtime
                     {
                         partCounts[sprite]=1;
                         var description = partDescriptions.ContainsKey(part.partId) ? partDescriptions[part.partId] : null;
-                        partInfo[sprite] = new Tuple<string, string, Color, string, int>(part.partId, description, color.color, color.name, i);
+                        partInfo[sprite] = new Tuple<string, string, string, int>(id, description, colorName, i);
                     }
                 }
                 else
@@ -134,7 +146,7 @@ namespace LDraw.Runtime
             foreach (var kvp in partCounts)
             {
                 var info = partInfo[kvp.Key];
-                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3, info.Item4, info.Item5);
+                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3, info.Item4);
             }
 
             leftPaneToggle.SetItemCount(partCounts.Count);
@@ -290,7 +302,7 @@ namespace LDraw.Runtime
         /// <summary>
         /// Adds a new item to the grid.
         /// </summary>
-        public void AddItem(Sprite icon, string label, string partId, string description, Color color, string colorName, int index)
+        public void AddItem(Sprite icon, string label, string partId, string description, string colorName, int index)
         {
             // Create new item under the parent
             GameObject obj = Instantiate(gridItemPrefab, gridParent);
@@ -313,7 +325,7 @@ namespace LDraw.Runtime
                         clone.transform.position = Vector3.zero;
                         clone.transform.rotation = Quaternion.identity;
                         
-                        leftPaneToggle.PreviewItem(partId, description, color, colorName, clone);
+                        leftPaneToggle.PreviewItem(partId, description, colorName, clone);
                     });
             }
             else

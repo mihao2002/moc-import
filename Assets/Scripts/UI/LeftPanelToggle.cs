@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using UnityEngine.UI;
 using LDraw.Runtime;
+using TMPro;
 
 public class LeftPanelToggle : MonoBehaviour
 {
@@ -13,6 +14,9 @@ public class LeftPanelToggle : MonoBehaviour
     public GameObject partDetail;
     public GameObject expander;
     public Camera previewCamera;
+    public TMP_Text partId;
+    public TMP_Text partColor;
+    public TMP_Text partDescriptions;
 
     private Color selectedColor = new Color(0.2f, 0.2f, 0.2f, 1f);
 
@@ -39,6 +43,7 @@ public class LeftPanelToggle : MonoBehaviour
         partDetail.SetActive(false);
         expander.SetActive(false);
 
+        previewCamera.aspect = 1;
         ldrawCamera = new LDrawCamera(previewCamera);
         inputHandler = new InputHandler(ldrawCamera);
     }
@@ -52,10 +57,8 @@ public class LeftPanelToggle : MonoBehaviour
         }
     }
 
-    public void PreviewItem(string partId, string description, Color color, string colorName, GameObject previewPart)
+    public void PreviewItem(string id, string desc, string colorName, GameObject previewPart)
     {
-        Debug.LogError($"PreviewItem {partId} {description} {color} {colorName} {previewPart.name}");
-
         DestoryPreviewPart();
 
         this.previewPart = previewPart;
@@ -65,6 +68,9 @@ public class LeftPanelToggle : MonoBehaviour
         var rotation = LDrawCamera.DefaultRotation;
 
         ldrawCamera.SetCamera(bounds.center, radius, rotation);
+        partId.text = id;
+        partColor.text = colorName;
+        partDescriptions.text = desc;
 
         if (!isExpanded)
         {

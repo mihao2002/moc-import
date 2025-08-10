@@ -369,6 +369,7 @@ namespace LDraw.Editor
 
             var camGO = new GameObject("PreviewCamera");
             var cam = camGO.AddComponent<Camera>();
+            cam.aspect = 1;
             var ldrawCamera = CreatePreviewCamera(cam, rt);
 
             // construct model steps
@@ -394,11 +395,22 @@ namespace LDraw.Editor
 
                     foreach (var part in step.parts)
                     {
-                        var color = colors[part.color];
                         GameObject go = partLoader.GetGameObject(part.partId, part.color);
 
                         go.SetActive(true);
-                        CreateImage(part.partId, color.color, go, ldrawCamera, rt);
+
+
+                        var filename = part.partId.Replace('\\', '_');
+                        if (!modelNames.ContainsKey(part.partId))
+                        {
+                            var color = colors[part.color].color;
+                            string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
+                            string matName = $"Mat_{colorKey}";
+                            filename = $"{matName}_{filename}";
+                        }
+                        // string imagePath = Path.Combine(imageFolder, $"{matName}_{filename}.png");
+
+                        CreateImage(filename, go, ldrawCamera, rt);
                         go.SetActive(false);
 
                         go.transform.position = part.position;
@@ -475,13 +487,13 @@ namespace LDraw.Editor
             return new LDrawCamera(cam);
         }
 
-        public static void CreateImage(string partId, Color color, GameObject go, LDrawCamera camera, RenderTexture rt)
+        public static void CreateImage(string filename, GameObject go, LDrawCamera camera, RenderTexture rt)
         {
             string imageFolder = "Assets/Resources/LDrawImages";
-            string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
-            string matName = $"Mat_{colorKey}";
-            var filename = partId.Replace('\\', '_');
-            string imagePath = Path.Combine(imageFolder, $"{matName}_{filename}.png");
+            // string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            // string matName = $"Mat_{colorKey}";
+            // var filename = partId.Replace('\\', '_');
+            string imagePath = Path.Combine(imageFolder, $"{filename}.png");
 
             if (File.Exists(imagePath))
             {
