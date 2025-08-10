@@ -621,6 +621,8 @@ namespace LDraw.Editor
                     return (null, null);
                 }
 
+                var mat = ldrawMesh.go.GetComponent<Renderer>().sharedMaterials[0];
+
                 partCache[partId] = (ldrawMesh, description);
 
                 return (ldrawMesh, description);
@@ -732,7 +734,7 @@ namespace LDraw.Editor
                     {
                         isPart = true;
 
-                        gameObject = partCache[part.partId].Item1.go;
+                        gameObject = GameObject.Instantiate(partCache[part.partId].Item1.go);
                         var meshFilter = gameObject.GetComponent<MeshFilter>();
                         if (meshFilter == null)
                         {
@@ -876,6 +878,7 @@ namespace LDraw.Editor
 
             go.SetActive(false);
             submodelCache[partId] = go;
+
             return go;
         }
 

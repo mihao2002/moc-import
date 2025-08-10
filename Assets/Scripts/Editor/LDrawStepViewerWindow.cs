@@ -396,9 +396,7 @@ namespace LDraw.Editor
                     foreach (var part in step.parts)
                     {
                         GameObject go = partLoader.GetGameObject(part.partId, part.color);
-
                         go.SetActive(true);
-
 
                         var filename = part.partId.Replace('\\', '_');
                         if (!modelNames.ContainsKey(part.partId))
