@@ -11,7 +11,7 @@ namespace LDraw.Editor
 {
     public class LDrawMesh
     {
-        public Mesh mesh;
+        public GameObject go;
         public bool isCW;
     }
 
@@ -23,12 +23,15 @@ namespace LDraw.Editor
         private Dictionary<string, List<LDrawStep>> models = new Dictionary<string, List<LDrawStep>>();
         private HashSet<int> usedColors;
         private Dictionary<string, string> partDescriptions;
+        private Material mainMaterial;
+        private int mainColorIndex = 16;
 
         public LDrawPartLoader(Dictionary<int, LDrawColor> colors)
         {
             this.colors = colors;
             usedColors = new HashSet<int>();
             partDescriptions = new Dictionary<string, string>();
+            mainMaterial = GetOrCreateMaterial(mainColorIndex);
         }
 
         public Dictionary<int, LDrawColor> GetUsedColors()
@@ -110,16 +113,24 @@ namespace LDraw.Editor
 
         public GameObject GetGameObject(string partId, int color)
         {
-            GameObject go = new GameObject(partId);
+            GameObject go; // = new GameObject(partId);
             if (partCache.ContainsKey(partId))
             {
-                // Add MeshFilter and assign the mesh
-                MeshFilter meshFilter = go.AddComponent<MeshFilter>();
-                meshFilter.mesh = partCache[partId].Item1.mesh;
+                go = GameObject.Instantiate(partCache[partId].Item1.go);
 
-                // Add MeshRenderer and assign material
-                MeshRenderer meshRenderer = go.AddComponent<MeshRenderer>();
-                meshRenderer.sharedMaterial = GetOrCreateMaterial(color);
+                var material = GetOrCreateMaterial(color);
+
+                Renderer rend = go.GetComponent<Renderer>();
+                Material[] sharedMats = rend.sharedMaterials;
+                for (var i=0;i<sharedMats.Length;i++)
+                {
+                    if (sharedMats[i] == mainMaterial)
+                    {
+                        sharedMats[i] = material;
+                        rend.sharedMaterials = sharedMats;
+                        break;
+                    }
+                }               
             }
             else if (submodelCache.ContainsKey(partId))
             {
@@ -128,6 +139,7 @@ namespace LDraw.Editor
             else
             {
                 Debug.LogError($"Can't find part {partId}.");
+                return null;
             }
 
             return go;
@@ -255,10 +267,10 @@ namespace LDraw.Editor
             return combined;
         }
 
-        private (LDrawMesh, string) ParsePartFileLines(string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths, bool needDescription)
+        private (LDrawMesh, string) ParsePartFileLines(string partId, string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths, bool needDescription)
         {
-            var allVertices = new List<Vector3>();
-            var allTriangles = new List<int>();
+            var colorInstances = new Dictionary<Material, (List<Vector3>, List<int>)>();
+            var hasContent = false;
 
             bool invertNext = false;
             bool isCW = false;
@@ -301,7 +313,7 @@ namespace LDraw.Editor
                 if (tokens.Length < 2) continue;
 
                 string type = tokens[0];
-
+             
                 try
                 {
                     switch (type)
@@ -310,140 +322,195 @@ namespace LDraw.Editor
                             break;
 
                         case "1":
-                            if (tokens.Length >= 15)
+                        case "3":
+                        case "4":
+                            var color = int.Parse(tokens[1]);
+                            var mat = GetOrCreateMaterial(color);
+
+                            List<Vector3> allVertices = null;
+                            List<int> allTriangles = null;
+                            
+                            if (colorInstances.ContainsKey(mat))
                             {
-                                string referencedPartId = tokens[14].ToLower();
+                                (allVertices, allTriangles) = colorInstances[mat];
+                            }
+                            else
+                            {
+                                allVertices = new List<Vector3>();
+                                allTriangles = new List<int>();
+                                colorInstances[mat] = (allVertices, allTriangles);
+                            }
 
-                                float tx = float.Parse(tokens[2]) * 0.01f;
-                                float ty = float.Parse(tokens[3]) * 0.01f;
-                                float tz = float.Parse(tokens[4]) * 0.01f;
-
-                                Matrix4x4 transform = new Matrix4x4();
-                                transform.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
-                                transform.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
-                                transform.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
-                                transform.SetColumn(3, new Vector4(tx, ty, tz, 1));
-
-                                bool isMirrored = MatrixIsMirrored(transform);
-                                transform = Consts.NegateZ * transform * Consts.NegateZ;
-
-                                (LDrawMesh ldrawMesh, _) = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
-                                if (ldrawMesh != null)
+                            if (type == "1")
+                            {
+                                if (tokens.Length >= 15)
                                 {
-                                    //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
-                                    //bool mirrorXform = MatrixIsMirrored(transform);
+                                    string referencedPartId = tokens[14].ToLower();
 
-                                    // Apply coordinate system swap
-                                    // Check for mirroring (OPTIONAL)
-                                    //bool isMirrored = MatrixIsMirrored(transform);
+                                    float tx = float.Parse(tokens[2]) * 0.01f;
+                                    float ty = float.Parse(tokens[3]) * 0.01f;
+                                    float tz = float.Parse(tokens[4]) * 0.01f;
 
-                                    // Final winding decision
-                                    bool invertFace = invertNext ^ isMirrored;
+                                    Matrix4x4 transform = new Matrix4x4();
+                                    transform.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
+                                    transform.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
+                                    transform.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
+                                    transform.SetColumn(3, new Vector4(tx, ty, tz, 1));
 
-                                    // bool invertFace = invertNext ^ mirrorXform ^ !isCW;
-                                    Mesh referencedMesh = ldrawMesh.mesh;
+                                    bool isMirrored = MatrixIsMirrored(transform);
+                                    transform = Consts.NegateZ * transform * Consts.NegateZ;
 
-                                    int vertexOffset = allVertices.Count;
-                                    foreach (var v in referencedMesh.vertices)
+                                    (LDrawMesh ldrawMesh, _) = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
+                                    if (ldrawMesh != null)
                                     {
-                                        Vector3 v2 = transform.MultiplyPoint3x4(v);
-                                        allVertices.Add(v2);
-                                    }
+                                        hasContent = true;
 
-                                    //Apply correct winding if mirrored
-                                    if (invertFace)
-                                    {
-                                        for (int i = 0; i < referencedMesh.triangles.Length; i += 3)
+                                        //bool invertFace = invertNext ^ (isCW != ldrawMesh.isCW);
+                                        //bool mirrorXform = MatrixIsMirrored(transform);
+
+                                        // Apply coordinate system swap
+                                        // Check for mirroring (OPTIONAL)
+                                        //bool isMirrored = MatrixIsMirrored(transform);
+
+                                        // Final winding decision
+                                        bool invertFace = invertNext ^ isMirrored;
+
+                                        var gameObject = ldrawMesh.go;
+                                        var subRenderer = gameObject.GetComponent<MeshRenderer>();
+                                        var meshFilter = gameObject.GetComponent<MeshFilter>();
+                                        var meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
+
+                                        for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
                                         {
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i]);
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i + 2]);
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i + 1]);
-                                            //Debug.Log($"Triangle : {allVertices[vertexOffset + referencedMesh.triangles[i]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 2]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 1]]} (invertFace={invertFace})");
+                                            Material material = subRenderer.sharedMaterials[subIdx];
+                                            if (material == mainMaterial)
+                                            {
+                                                material = mat;
+                                            }
+
+                                            List<Vector3> vertices = null;
+                                            List<int> triangles = null;
+                                            
+                                            if (colorInstances.ContainsKey(material))
+                                            {
+                                                (vertices, triangles) = colorInstances[material];
+                                            }
+                                            else
+                                            {
+                                                vertices = new List<Vector3>();
+                                                triangles = new List<int>();
+                                                colorInstances[material] = (vertices, triangles);
+                                            } 
+
+                                            Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
+
+                                            int vertexOffset = vertices.Count;
+                                            foreach (var v in submesh.vertices)
+                                            {
+                                                Vector3 v2 = transform.MultiplyPoint3x4(v);
+                                                vertices.Add(v2);
+                                            }
+
+                                            //Apply correct winding if mirrored
+                                            if (invertFace)
+                                            {
+                                                for (int i = 0; i < submesh.triangles.Length; i += 3)
+                                                {
+                                                    triangles.Add(vertexOffset + submesh.triangles[i]);
+                                                    triangles.Add(vertexOffset + submesh.triangles[i + 2]);
+                                                    triangles.Add(vertexOffset + submesh.triangles[i + 1]);
+                                                    //Debug.Log($"Triangle : {allVertices[vertexOffset + referencedMesh.triangles[i]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 2]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 1]]} (invertFace={invertFace})");
+                                                }
+                                            }
+                                            else
+                                            {
+                                                for (int i = 0; i < submesh.triangles.Length; i += 3)
+                                                {
+                                                    triangles.Add(vertexOffset + submesh.triangles[i]);
+                                                    triangles.Add(vertexOffset + submesh.triangles[i + 1]);
+                                                    triangles.Add(vertexOffset + submesh.triangles[i + 2]);
+                                                    //Debug.Log($"Triangle : {allVertices[vertexOffset + referencedMesh.triangles[i]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 1]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 2]]} (invertFace={invertFace})");
+                                                }
+                                            }
                                         }
                                     }
                                     else
                                     {
-                                        for (int i = 0; i < referencedMesh.triangles.Length; i += 3)
-                                        {
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i]);
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i + 1]);
-                                            allTriangles.Add(vertexOffset + referencedMesh.triangles[i + 2]);
-                                            //Debug.Log($"Triangle : {allVertices[vertexOffset + referencedMesh.triangles[i]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 1]]} -> {allVertices[vertexOffset + referencedMesh.triangles[i + 2]]} (invertFace={invertFace})");
-                                        }
+                                        Debug.LogWarning($"Missing subpart: {referencedPartId}");
                                     }
                                 }
-                                else
-                                {
-                                    Debug.LogWarning($"Missing subpart: {referencedPartId}");
-                                }
+                                invertNext = false;
+                                break;
                             }
-                            invertNext = false;
-                            break;
+                            else if (type == "3")
+                            { 
+                                if (tokens.Length >= 11)
+                                {
+                                    hasContent = true;
+                                    Vector3 v1 = new Vector3(float.Parse(tokens[2]), float.Parse(tokens[3]), float.Parse(tokens[4])) * 0.01f;
+                                    Vector3 v2 = new Vector3(float.Parse(tokens[5]), float.Parse(tokens[6]), float.Parse(tokens[7])) * 0.01f;
+                                    Vector3 v3 = new Vector3(float.Parse(tokens[8]), float.Parse(tokens[9]), float.Parse(tokens[10])) * 0.01f;
 
-                        case "3":
-                            if (tokens.Length >= 11)
+                                    int baseIdx = allVertices.Count;
+                                    allVertices.Add(NegateZ(v1));
+                                    allVertices.Add(NegateZ(v2));
+                                    allVertices.Add(NegateZ(v3));
+
+                                    bool invertFace = invertNext ^ !isCW;
+                                    if (invertFace)
+                                    {
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 2);
+                                        allTriangles.Add(baseIdx + 1);
+                                    }
+                                    else
+                                    {
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 1);
+                                        allTriangles.Add(baseIdx + 2);
+                                    }
+                                }
+                                invertNext = false;
+                            }
+                            else
                             {
-                                Vector3 v1 = new Vector3(float.Parse(tokens[2]), float.Parse(tokens[3]), float.Parse(tokens[4])) * 0.01f;
-                                Vector3 v2 = new Vector3(float.Parse(tokens[5]), float.Parse(tokens[6]), float.Parse(tokens[7])) * 0.01f;
-                                Vector3 v3 = new Vector3(float.Parse(tokens[8]), float.Parse(tokens[9]), float.Parse(tokens[10])) * 0.01f;
-
-                                int baseIdx = allVertices.Count;
-                                allVertices.Add(NegateZ(v1));
-                                allVertices.Add(NegateZ(v2));
-                                allVertices.Add(NegateZ(v3));
-
-                                bool invertFace = invertNext ^ !isCW;
-                                if (invertFace)
+                                if (tokens.Length >= 14)
                                 {
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 2);
-                                    allTriangles.Add(baseIdx + 1);
+                                    hasContent = true;
+                                    Vector3 v1 = new Vector3(float.Parse(tokens[2]), float.Parse(tokens[3]), float.Parse(tokens[4])) * 0.01f;
+                                    Vector3 v2 = new Vector3(float.Parse(tokens[5]), float.Parse(tokens[6]), float.Parse(tokens[7])) * 0.01f;
+                                    Vector3 v3 = new Vector3(float.Parse(tokens[8]), float.Parse(tokens[9]), float.Parse(tokens[10])) * 0.01f;
+                                    Vector3 v4 = new Vector3(float.Parse(tokens[11]), float.Parse(tokens[12]), float.Parse(tokens[13])) * 0.01f;
+
+                                    int baseIdx = allVertices.Count;
+                                    allVertices.Add(NegateZ(v1));
+                                    allVertices.Add(NegateZ(v2));
+                                    allVertices.Add(NegateZ(v3));
+                                    allVertices.Add(NegateZ(v4));
+
+                                    bool invertFace = invertNext ^ !isCW;
+                                    if (invertFace)
+                                    {
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 2);
+                                        allTriangles.Add(baseIdx + 1);
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 3);
+                                        allTriangles.Add(baseIdx + 2);
+                                    }
+                                    else
+                                    {
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 1);
+                                        allTriangles.Add(baseIdx + 2);
+                                        allTriangles.Add(baseIdx);
+                                        allTriangles.Add(baseIdx + 2);
+                                        allTriangles.Add(baseIdx + 3);
+                                    }
                                 }
-                                else
-                                {
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 1);
-                                    allTriangles.Add(baseIdx + 2);
-                                }
+                                invertNext = false;
+                                break;
                             }
-                            invertNext = false;
-                            break;
-
-                        case "4":
-                            if (tokens.Length >= 14)
-                            {
-                                Vector3 v1 = new Vector3(float.Parse(tokens[2]), float.Parse(tokens[3]), float.Parse(tokens[4])) * 0.01f;
-                                Vector3 v2 = new Vector3(float.Parse(tokens[5]), float.Parse(tokens[6]), float.Parse(tokens[7])) * 0.01f;
-                                Vector3 v3 = new Vector3(float.Parse(tokens[8]), float.Parse(tokens[9]), float.Parse(tokens[10])) * 0.01f;
-                                Vector3 v4 = new Vector3(float.Parse(tokens[11]), float.Parse(tokens[12]), float.Parse(tokens[13])) * 0.01f;
-
-                                int baseIdx = allVertices.Count;
-                                allVertices.Add(NegateZ(v1));
-                                allVertices.Add(NegateZ(v2));
-                                allVertices.Add(NegateZ(v3));
-                                allVertices.Add(NegateZ(v4));
-
-                                bool invertFace = invertNext ^ !isCW;
-                                if (invertFace)
-                                {
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 2);
-                                    allTriangles.Add(baseIdx + 1);
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 3);
-                                    allTriangles.Add(baseIdx + 2);
-                                }
-                                else
-                                {
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 1);
-                                    allTriangles.Add(baseIdx + 2);
-                                    allTriangles.Add(baseIdx);
-                                    allTriangles.Add(baseIdx + 2);
-                                    allTriangles.Add(baseIdx + 3);
-                                }
-                            }
-                            invertNext = false;
                             break;
 
                         case "2":
@@ -463,18 +530,65 @@ namespace LDraw.Editor
                 }
             }
 
-            if (allVertices.Count == 0 || allTriangles.Count == 0)
+            if (!hasContent)
             {                
                 return (null, null);
             }
 
-            Mesh mesh = new Mesh();
-            mesh.vertices = allVertices.ToArray();
-            mesh.triangles = allTriangles.ToArray();
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
+            var go = CreateMultiMeshObject(partId, colorInstances);
+            go.SetActive(false);
+            return (new LDrawMesh{go=go, isCW=isCW}, needDescription ? description : comment);
+        }
 
-            return (new LDrawMesh{mesh=mesh, isCW=isCW}, needDescription ? description : comment);
+        private GameObject CreateMultiMeshObject(string partId, Dictionary<Material, (List<Vector3>, List<int>)> coloredContent)
+        {
+            // Combine meshes by color/material group into submeshes
+            var subMeshList = new List<CombineInstance>();
+            var materialList = new List<Material>();
+
+            foreach (var kvp in coloredContent)
+            {                    
+                var material = kvp.Key;
+
+                var mesh = new Mesh();
+
+                // Assign vertices and triangles to mesh
+                mesh.vertices = kvp.Value.Item1.ToArray();
+                mesh.triangles = kvp.Value.Item2.ToArray();
+
+                // Optional: recalculate normals and bounds
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+
+                subMeshList.Add(new CombineInstance
+                {
+                    mesh = mesh,
+                    transform = Matrix4x4.identity
+                });
+
+                materialList.Add(material);
+            }
+
+            Mesh finalMesh = new Mesh();
+            
+            // Set index format to UInt32 to support more than 65,535 vertices
+            finalMesh.indexFormat = IndexFormat.UInt32;
+            finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
+
+            if (finalMesh.subMeshCount != materialList.Count)
+            {
+                Debug.LogError($"Mismatch in submesh count: {finalMesh.subMeshCount} vs materials: {materialList.Count} for for submodel {partId}.");
+                return null;
+            }
+
+            // Save prefab with all submeshes and materials
+            GameObject go = new GameObject(partId);
+
+            // Mesh meshAsset = SaveMeshAsset(finalMesh, partId);
+            go.AddComponent<MeshFilter>().sharedMesh = finalMesh;
+            go.AddComponent<MeshRenderer>().sharedMaterials = materialList.ToArray();
+            
+            return go;
         }
 
         private (LDrawMesh, string) LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
@@ -500,7 +614,7 @@ namespace LDraw.Editor
 
             try
             {
-                (LDrawMesh ldrawMesh, string description) = ParsePartFileLines(lines, partLibraryPath, unofficialPartLibraryPaths, needDescription);
+                (LDrawMesh ldrawMesh, string description) = ParsePartFileLines(partId, lines, partLibraryPath, unofficialPartLibraryPaths, needDescription);
                 if (ldrawMesh == null)
                 {
                     Debug.LogWarning($"No geometry parsed from: {partId}");
@@ -527,17 +641,21 @@ namespace LDraw.Editor
             }
             if (ldrawMesh != null)
             {
-                GameObject go = new GameObject(partId);
-                Mesh meshAsset = SaveMeshAsset(ldrawMesh.mesh, partId);
-                go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
+                var go = ldrawMesh.go;
+                go.SetActive(true);               
+                MeshFilter mf = go.GetComponent<MeshFilter>();
+                Mesh meshAsset = SaveMeshAsset(mf.sharedMesh, partId);
+                mf.sharedMesh = meshAsset;
 
                 string prefabFolder = "Assets/Resources/LDrawPrefabs";
                 if (!Directory.Exists(prefabFolder))
                     Directory.CreateDirectory(prefabFolder);
+
                 var fileName = partId.Replace('\\', '_');
                 string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
                 PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
-                UnityEngine.Object.DestroyImmediate(go);
+
+                go.SetActive(false);
             }
             else
             {
@@ -608,16 +726,25 @@ namespace LDraw.Editor
                 {
                     bool isPart = false;
                     Mesh meshCopy = null;
+                    GameObject gameObject = null;
                     // decide if this is a part of submodel
                     if (partCache.ContainsKey(part.partId))
                     {
                         isPart = true;
-                        LDrawMesh subMesh = partCache[part.partId].Item1;
-                        meshCopy = UnityEngine.Object.Instantiate(subMesh.mesh);
+
+                        gameObject = partCache[part.partId].Item1.go;
+                        var meshFilter = gameObject.GetComponent<MeshFilter>();
+                        if (meshFilter == null)
+                        {
+                            Debug.LogError($"Can't find mesh filter for {part.partId} for submodel {partId}.");
+                            return null;
+                        }
+
+                        meshCopy = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
                     }
                     else if (submodelCache.ContainsKey(part.partId))
                     {
-                        var gameObject = submodelCache[part.partId];
+                        gameObject = submodelCache[part.partId];
                         var meshFilter = gameObject.GetComponent<MeshFilter>();
                         if (meshFilter == null)
                         {
@@ -649,6 +776,7 @@ namespace LDraw.Editor
 
                     if (isPart)
                     {
+                        // Assign the main color
                         var ci = new CombineInstance
                         {
                             mesh = meshCopy,
@@ -657,34 +785,42 @@ namespace LDraw.Editor
 
                         var material = GetOrCreateMaterial(part.color);
 
-                        if (!colorToInstances.ContainsKey(material))
-                            colorToInstances[material] = new List<CombineInstance>();
-                        colorToInstances[material].Add(ci);
-                    }
-                    else
-                    {
-                        var gameObject = submodelCache[part.partId];
-                        var subRenderer = gameObject.GetComponent<MeshRenderer>();
+                        var renderer = gameObject.GetComponent<Renderer>();
+                        // Get a copy of shared materials array
+                        Material[] mats = renderer.sharedMaterials;
 
-                        for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
+                        bool replaced = false;
+                        for (int i = 0; i < mats.Length; i++)
                         {
-                            // Mesh submesh = new Mesh();
-                            // submesh.vertices = meshCopy.vertices;
-                            // submesh.normals = meshCopy.normals;
-                            // submesh.triangles = meshCopy.GetTriangles(subIdx);
-                            // submesh.RecalculateBounds();
-                            Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
-                            var ci = new CombineInstance
+                            if (mats[i] == mainMaterial)
                             {
-                                mesh = submesh,
-                                transform = Matrix4x4.identity
-                            };
-
-                            Material mat = subRenderer.sharedMaterials[subIdx];
-                            if (!colorToInstances.ContainsKey(mat))
-                                colorToInstances[mat] = new List<CombineInstance>();
-                            colorToInstances[mat].Add(ci);
+                                mats[i] = material;
+                                replaced = true;
+                            }
                         }
+
+                        // If replaced at least one, assign the modified array back
+                        if (replaced)
+                        {
+                            renderer.sharedMaterials = mats;
+                        }
+                    }
+
+                    var subRenderer = gameObject.GetComponent<MeshRenderer>();
+
+                    for (int subIdx = 0; subIdx < meshCopy.subMeshCount; subIdx++)
+                    {
+                        Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
+                        var ci = new CombineInstance
+                        {
+                            mesh = submesh,
+                            transform = Matrix4x4.identity
+                        };
+
+                        Material mat = subRenderer.sharedMaterials[subIdx];
+                        if (!colorToInstances.ContainsKey(mat))
+                            colorToInstances[mat] = new List<CombineInstance>();
+                        colorToInstances[mat].Add(ci);
                     }
                 }
             }

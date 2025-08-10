@@ -35,6 +35,7 @@ namespace LDraw.Runtime
         private Dictionary<int, LDrawColor> colors;
         private Dictionary<string, string> partDescriptions;
         private HashSet<string> modelNames;
+        private Material mainMaterial;
 
         void Start()
         {
@@ -51,6 +52,10 @@ namespace LDraw.Runtime
             partDescriptions = data.partDescriptions;
             modelNames = new HashSet<string>(models.Select(m=>m.modelName));
             var flatSteps = data.flatSteps;
+
+            var color = colors[16].color;
+            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            mainMaterial = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
 
             PreInstantiateAllParts(models, colors); // Runtime-specific: instantiate from prefabs
 
@@ -257,13 +262,16 @@ namespace LDraw.Runtime
                             var color = colors[part.color].color;
                             string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
                             var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
-                            if (mat != null)
+
+                            Material[] sharedMats = renderer.sharedMaterials;
+                            for (var i=0;i<sharedMats.Length;i++)
                             {
-                                renderer.material = mat;
-                            }
-                            else
-                            {
-                                Debug.LogError($"Missing material asset for color {colorKey} on part {part.partId}. Material asset must exist. Skipping material assignment.");
+                                if (sharedMats[i] == mainMaterial)
+                                {
+                                    sharedMats[i] = mat;
+                                    renderer.sharedMaterials = sharedMats;
+                                    break;
+                                }
                             }
                         }
                         objs.Add(go);
