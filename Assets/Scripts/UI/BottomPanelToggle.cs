@@ -1,24 +1,59 @@
 using UnityEngine;
 using System.Collections;
+using System;
 
 public class BottomPanelToggle : MonoBehaviour
 {
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
     public RectTransform arrowImage;     // The arrow image inside the button
-    public float paneHeight = 400f;
-    public float buttonHalfHeight = 80f;
+    public RectTransform previous;
+    public RectTransform next;
+    public RectTransform stepNumber;
+    public RectTransform expander;
+    public RectTransform slider;
+    public GameObject stepPrefab;
+    public Transform stepListParent;
+    
+    private float paneHeight = 400f;
+    private float itemSize = 80f;
 
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
     
-
-    void Start()
+    void Awake()
     {
+        var uiManager = UIManager.Instance;
+
+        paneHeight = uiManager.BaseUnit * 3;        
+        itemSize = uiManager.BaseUnit*2;
+
         // paneHeight = Screen.height / 3.0f;
         sidePanel.sizeDelta = new Vector2(sidePanel.sizeDelta.x, paneHeight);
+        previous.sizeDelta = next.sizeDelta = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit);
+        expander.sizeDelta = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit/2);
+
+        var padding = uiManager.Padding;
+        previous.anchoredPosition = new Vector2(padding, previous.anchoredPosition.y);
+        next.anchoredPosition = new Vector2(-padding, next.anchoredPosition.y);
+        stepNumber.anchoredPosition = new Vector2(-padding, stepNumber.anchoredPosition.y);
+
+        // Set left gap to 20
+        slider.offsetMin = new Vector2(uiManager.BaseUnit, slider.offsetMin.y);
+        slider.offsetMax = new Vector2(-uiManager.BaseUnit, slider.offsetMax.y);
 
         Hide();
+    }
+
+    public void AddStep(Sprite sprite, int step, Action action)
+    {
+        // Create new item under the parent
+        GameObject obj = Instantiate(stepPrefab, stepListParent);
+        var rt = obj.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(itemSize, itemSize);
+        PartGridItem itemUI = obj.GetComponent<PartGridItem>();
+
+        itemUI.SetContent(sprite, $"{step+1}", action);
     }
 
     void Hide()
@@ -27,7 +62,7 @@ public class BottomPanelToggle : MonoBehaviour
       
         // Rotate the arrow 180 degrees around Z to flip it
         arrowImage.localEulerAngles = new Vector3(0, 0, 0);
-        arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, buttonHalfHeight);
+        // arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, buttonHalfHeight);
     }
 
     // Call this method from the Button onClick event
@@ -59,6 +94,6 @@ public class BottomPanelToggle : MonoBehaviour
 
         // Rotate the arrow 180 degrees around Z to flip it
         arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
-        arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, isExpanded ? -buttonHalfHeight : buttonHalfHeight);
+        // arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, isExpanded ? -buttonHalfHeight : buttonHalfHeight);
     }
 }

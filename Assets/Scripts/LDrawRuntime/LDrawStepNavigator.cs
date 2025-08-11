@@ -21,7 +21,8 @@ namespace LDraw.Runtime
         public GameObject gridItemPrefab;  // The prefab for each item
         public Transform gridParent;       // The container with GridLayoutGroup
         public LeftPanelToggle leftPaneToggle;
-        public GameObject stepPrefab;
+        public BottomPanelToggle bottomPaneToggle;
+        // public GameObject stepPrefab;
         public Transform stepListParent;
 
         private LDrawCamera cam;
@@ -286,24 +287,13 @@ namespace LDraw.Runtime
         {
             for (var i=0;i<stepSprites.Length;i++)
             {
-                // Create new item under the parent
-                GameObject obj = Instantiate(stepPrefab, stepListParent);
-                PartGridItem itemUI = obj.GetComponent<PartGridItem>();
-
-                if (itemUI != null)
+                int stepIdx = i;
+                bottomPaneToggle.AddStep(stepSprites[stepIdx], i, ()=>
                 {
-                    var stepIdx = i;
-                    itemUI.SetContent(stepSprites[i], $"{stepIdx+1}", ()=>
-                    {
-                        navigator.GotoStep(stepIdx);
-                        UpdateNavigationText();
-                        ShowStepParts();  
-                    });
-                }
-                else
-                {
-                    Debug.LogWarning("Step item prefab is missing PartGridItem script.");
-                }
+                    navigator.GotoStep(stepIdx);
+                    UpdateNavigationText();
+                    ShowStepParts();  
+                });
             }
         }
 

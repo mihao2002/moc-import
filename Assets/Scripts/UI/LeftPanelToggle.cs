@@ -17,6 +17,8 @@ public class LeftPanelToggle : MonoBehaviour
     public TMP_Text partId;
     public TMP_Text partColor;
     public TMP_Text partDescriptions;
+    public RectTransform partImageContainer;
+    public RectTransform partInfo;
 
     private Color selectedColor = new Color(0.2f, 0.2f, 0.2f, 1f);
 
@@ -25,8 +27,8 @@ public class LeftPanelToggle : MonoBehaviour
     public float animationDuration = 0.2f;
     private float columnWidth;
     private float columnSpacing;
-    private float padding;
-    private float fixRowCount;
+    private int padding;
+    private int fixRowCount;
     private Color buttonColor;
 
     private GameObject previewPart = null;
@@ -35,10 +37,23 @@ public class LeftPanelToggle : MonoBehaviour
 
     void Awake()
     {
-        columnWidth = grid.cellSize.x;
-        columnSpacing = grid.spacing.x;
-        padding = grid.padding.left + grid.padding.right;
+        var uiManager = UIManager.Instance;
+
+        grid.cellSize = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit);
+        columnWidth = uiManager.BaseUnit;
+        columnSpacing = 0;
+        padding = uiManager.Padding;
+        grid.constraintCount = uiManager.FixRowCount;
+        grid.padding = new RectOffset(padding, padding, uiManager.BaseUnit, 0);
+
+        partImageContainer.offsetMin = new Vector2(partImageContainer.offsetMin.x, uiManager.BaseUnit * 2);
+        partInfo.offsetMax = new Vector2(partInfo.offsetMax.x, uiManager.BaseUnit * 2);
+
+        // columnWidth = grid.cellSize.x;
+        // columnSpacing = grid.spacing.x;
+        // padding = grid.padding.left + grid.padding.right;
         fixRowCount = grid.constraintCount;
+
         // buttonColor = button.colors.normalColor;
         partDetail.SetActive(false);
         expander.SetActive(false);
@@ -80,14 +95,14 @@ public class LeftPanelToggle : MonoBehaviour
 
     public void SetItemCount(int itemCount)
     {
-        var columnCount = Mathf.CeilToInt(itemCount / fixRowCount);
+        var columnCount = Mathf.CeilToInt(itemCount / (float)fixRowCount);
 
-        panelWidth = columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding;
+        panelWidth = columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding * 2;
         float viewportX = panelWidth / Screen.width;
         float viewportWidth = 1.0f - viewportX;
         cam.rect = new Rect(viewportX, 0, viewportWidth, 1);
 
-        partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth, 0);
+        partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth + columnWidth, 0);
 
         if (isExpanded)
         {
@@ -130,17 +145,20 @@ public class LeftPanelToggle : MonoBehaviour
         float targetWidth = isExpanded ? Screen.width : panelWidth;
 
         // Animate width change (optional)
-        StartCoroutine(AnimateWidth(sidePanel, targetWidth));
+        StartCoroutine(AnimateWidth(sidePanel, targetWidth, isExpanded));
 
         // Rotate the arrow 180 degrees around Z to flip it
         // arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 90) : new Vector3(0, 0, -90);
         // SetButtonColor(isExpanded ? selectedColor : buttonColor);
-        partDetail.SetActive(isExpanded);
-        expander.SetActive(isExpanded);
     }
 
-    private IEnumerator AnimateWidth(RectTransform panel, float targetWidth)
+    private IEnumerator AnimateWidth(RectTransform panel, float targetWidth, bool isExpanded)
     {
+        if (!isExpanded)
+        {
+            partDetail.SetActive(false);
+        }
+
         float elapsed = 0f;
         float startWidth = sidePanel.sizeDelta.x;
 
@@ -154,6 +172,12 @@ public class LeftPanelToggle : MonoBehaviour
 
         panel.sizeDelta = new Vector2(targetWidth, sidePanel.sizeDelta.y);
 
+        if (isExpanded)
+        {
+            partDetail.SetActive(true);
+        }
+
+        expander.SetActive(isExpanded);
     }
 
     private void HandleInput()
