@@ -46,8 +46,8 @@ public class LeftPanelToggle : MonoBehaviour
         grid.constraintCount = uiManager.FixRowCount;
         grid.padding = new RectOffset(padding, padding, uiManager.BaseUnit, 0);
 
-        partImageContainer.offsetMin = new Vector2(partImageContainer.offsetMin.x, uiManager.BaseUnit * 2);
-        partInfo.offsetMax = new Vector2(partInfo.offsetMax.x, uiManager.BaseUnit * 2);
+        partImageContainer.offsetMin = new Vector2(partImageContainer.offsetMin.x, uiManager.BaseUnit);
+        partInfo.offsetMax = new Vector2(partInfo.offsetMax.x, uiManager.BaseUnit);
 
         // columnWidth = grid.cellSize.x;
         // columnSpacing = grid.spacing.x;

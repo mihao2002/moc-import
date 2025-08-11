@@ -422,18 +422,20 @@ namespace LDraw.Editor
 
                     var stepGO = modelContainer.AddStep(objs);
                     var bounds = LDrawUtils.CalculateBounds(stepGO);
-                    if (!initialized)
-                    {
-                        modelBounds = bounds;
-                        initialized = true;
-                    }
-                    else
-                    {
-                        modelBounds.Encapsulate(bounds);
-                    }
+                    // if (!initialized)
+                    // {
+                    //     modelBounds = bounds;
+                    //     initialized = true;
+                    // }
+                    // else
+                    // {
+                    //     modelBounds.Encapsulate(bounds);
+                    // }
                     
-                    step.center = modelBounds.center;
-                    step.radius = modelBounds.extents.magnitude;
+                    // step.center = modelBounds.center;
+                    // step.radius = modelBounds.extents.magnitude;
+                    step.center = bounds.center;
+                    step.radius = bounds.extents.magnitude;
 
                     if (isCancelled) yield break;
                 }

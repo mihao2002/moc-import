@@ -29,7 +29,7 @@ public class UIManager
         this.screenWidth = Screen.width;
         this.screenHeight = Screen.height;
 
-        baseUnit = screenHeight / 6;
+        baseUnit = screenHeight / 5;
         bottomPaneHeight = baseUnit * 2;
         padding = baseUnit / 10;
         fixRowCount = 3;
