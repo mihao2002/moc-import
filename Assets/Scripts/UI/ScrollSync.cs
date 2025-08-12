@@ -24,19 +24,18 @@ public class ScrollSync : MonoBehaviour
 
     void Update()
     {
-        // Only update slider if it's NOT being dragged
         if (!isDraggingSlider)
         {
             float pos = scrollRect.horizontalNormalizedPosition;
-            slider.SetValueWithoutNotify(pos);
+            if (!Mathf.Approximately(slider.value, pos))
+            {
+                slider.SetValueWithoutNotify(pos);
+            }
         }
     }
 
     void OnSliderValueChanged(float value)
     {
-        if (isDraggingSlider)
-        {
-                scrollRect.horizontalNormalizedPosition = value;
-        }
+        scrollRect.horizontalNormalizedPosition = value;
     }
 }

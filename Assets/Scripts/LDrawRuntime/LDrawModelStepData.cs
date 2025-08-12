@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace LDraw.Runtime
 {
@@ -32,6 +33,9 @@ namespace LDraw.Runtime
         public int rotRef; // index of another step whose rotation will be applied in this step, -1 means the default rotation
         public float radius; // always set by editor
         public Vector3 center; // the center of the game object
+
+        [JsonIgnore]
+        public Bounds modelBounds;
     }
 
     [Serializable]

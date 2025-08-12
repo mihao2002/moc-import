@@ -18,8 +18,6 @@ namespace LDraw.Runtime
         public TMP_Text stepNumberText;
         public Camera mainCamera; // Assign in inspector
 
-        public GameObject gridItemPrefab;  // The prefab for each item
-        public Transform gridParent;       // The container with GridLayoutGroup
         public LeftPanelToggle leftPaneToggle;
         public BottomPanelToggle bottomPaneToggle;
         // public GameObject stepPrefab;
@@ -37,6 +35,9 @@ namespace LDraw.Runtime
         private Dictionary<string, string> partDescriptions;
         private HashSet<string> modelNames;
         private Material mainMaterial;
+
+        private bool showParts = true;
+        private int currentStep = 0;
 
         void Start()
         {
@@ -60,7 +61,7 @@ namespace LDraw.Runtime
 
             PreInstantiateAllParts(models, colors); // Runtime-specific: instantiate from prefabs
 
-            cam = new LDrawCamera(mainCamera);
+            cam = new LDrawCamera(mainCamera, true);
             navigator = new LDrawFlatStepNavigator(models, cam, flatSteps);
             inputHandler = new InputHandler(cam);
 
@@ -69,7 +70,26 @@ namespace LDraw.Runtime
 
             PopulateSteps();
             UpdateNavigationText();
-            ShowStepParts();
+            ShowCurrentStep();
+        }
+
+        private void ShowCurrentStep()
+        {
+            if (showParts)
+            {                
+                PopulateStepParts();
+                leftPaneToggle.Expand(0, false);                
+            }
+            else
+            {
+                navigator.HideIfModelChange(currentStep);
+                leftPaneToggle.Shrink(() => {
+                    navigator.GotoStep(currentStep, true);                
+                });
+            }
+
+            bottomPaneToggle.SetSelectedItem(currentStep);
+            UpdateNavigationText();
         }
 
         public static Sprite[] LoadAllStepSpritesFromResources()
@@ -108,9 +128,9 @@ namespace LDraw.Runtime
             return result;
         }
 
-        private void ShowStepParts()
+        private void PopulateStepParts()
         {
-            var parts = navigator.GetCurrentParts();
+            var parts = navigator.GetStepParts(currentStep);
             var partCounts = new Dictionary<Sprite, int>();
             var partInfo = new Dictionary<Sprite, Tuple<string, string, string, int>>();
             for (var i=0; i<parts.Count; i++)
@@ -148,7 +168,7 @@ namespace LDraw.Runtime
                 }
             }
 
-            ClearGrid();
+            leftPaneToggle.ClearGrid();
             foreach (var kvp in partCounts)
             {
                 var info = partInfo[kvp.Key];
@@ -190,9 +210,20 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                navigator.ShowNextStep();
-                UpdateNavigationText(); 
-                ShowStepParts();               
+                if (showParts)
+                {
+                    showParts = false;
+                }
+                else
+                {
+                    if (currentStep < navigator.TotalStep - 1)
+                    {
+                        currentStep++;
+                        showParts = true;
+                    }
+                }
+
+                ShowCurrentStep();
             }
 
         }
@@ -201,9 +232,20 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                navigator.ShowPreviousStep();
-                UpdateNavigationText();
-                ShowStepParts();                  
+                if (!showParts)
+                {
+                    showParts = true;
+                }
+                else
+                {
+                    if (currentStep > 0)
+                    {
+                        currentStep--;
+                        showParts = false;
+                    }
+                }
+
+                ShowCurrentStep();
             }
         }
 
@@ -214,15 +256,9 @@ namespace LDraw.Runtime
                 return;
             }
 
-            if (navigationText != null)
-            {
-                var (modelName, stepIdx, stepCount) = navigator.GetCurrentStep();
-                navigationText.text = $"Model: {modelName} | Step: {stepIdx + 1} / {stepCount}";
-            }
-
             if (stepNumberText != null)
             {
-                stepNumberText.text = $"{navigator.CurrentStep+1}";
+                stepNumberText.text = $"{currentStep+1}";
             }
         }
 
@@ -288,11 +324,11 @@ namespace LDraw.Runtime
             for (var i=0;i<stepSprites.Length;i++)
             {
                 int stepIdx = i;
-                bottomPaneToggle.AddStep(stepSprites[stepIdx], i, ()=>
+                bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, ()=>
                 {
-                    navigator.GotoStep(stepIdx);
-                    UpdateNavigationText();
-                    ShowStepParts();  
+                    currentStep = stepIdx;
+                    showParts = true;
+                    ShowCurrentStep(); 
                 });
             }
         }
@@ -302,45 +338,8 @@ namespace LDraw.Runtime
         /// </summary>
         public void AddItem(Sprite icon, string label, string partId, string description, string colorName, int index)
         {
-            // Create new item under the parent
-            GameObject obj = Instantiate(gridItemPrefab, gridParent);
-
-            // Get the UI script from the prefab
-            PartGridItem itemUI = obj.GetComponent<PartGridItem>();
-
-            if (itemUI != null)
-            {
-                var go = navigator.GetPartFromCurrentStep(index);
-                itemUI.SetContent(icon, label, ()=>
-                    {
-                        GameObject clone = Instantiate(go);
-
-                        int previewLayer = LayerMask.NameToLayer("Preview");
-                        clone.layer = previewLayer;
-                        clone.SetActive(true);
-
-                        // Optional: reset local transforms
-                        clone.transform.position = Vector3.zero;
-                        clone.transform.rotation = Quaternion.identity;
-                        
-                        leftPaneToggle.PreviewItem(partId, description, colorName, clone);
-                    });
-            }
-            else
-            {
-                Debug.LogWarning("Grid item prefab is missing PartGridItem script.");
-            }
-        }
-
-        /// <summary>
-        /// Clears all items from the grid.
-        /// </summary>
-        public void ClearGrid()
-        {
-            foreach (Transform child in gridParent)
-            {
-                Destroy(child.gameObject);
-            }
+            var go = navigator.GetPartFromStep(currentStep, index);
+            leftPaneToggle.AddItem(icon, label, partId, description, colorName, go);
         }
     }
 }

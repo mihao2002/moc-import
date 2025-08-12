@@ -3,6 +3,8 @@ using System.Collections;
 using UnityEngine.UI;
 using LDraw.Runtime;
 using TMPro;
+using System;
+using System.Collections.Generic;
 
 public class LeftPanelToggle : MonoBehaviour
 {
@@ -19,6 +21,8 @@ public class LeftPanelToggle : MonoBehaviour
     public TMP_Text partDescriptions;
     public RectTransform partImageContainer;
     public RectTransform partInfo;
+    public GameObject gridItemPrefab;  // The prefab for each item
+    public Transform gridParent;       // The container with GridLayoutGroup
 
     private Color selectedColor = new Color(0.2f, 0.2f, 0.2f, 1f);
 
@@ -34,6 +38,8 @@ public class LeftPanelToggle : MonoBehaviour
     private GameObject previewPart = null;
     private LDrawCamera ldrawCamera;
     private InputHandler inputHandler;
+    private int selectedItem = 0;
+    private List<PartGridItem> items = new List<PartGridItem>();
 
     void Awake()
     {
@@ -59,7 +65,7 @@ public class LeftPanelToggle : MonoBehaviour
         expander.SetActive(false);
 
         previewCamera.aspect = 1;
-        ldrawCamera = new LDrawCamera(previewCamera);
+        ldrawCamera = new LDrawCamera(previewCamera, false);
         inputHandler = new InputHandler(ldrawCamera);
     }
 
@@ -87,10 +93,49 @@ public class LeftPanelToggle : MonoBehaviour
         partColor.text = colorName;
         partDescriptions.text = desc;
 
-        if (!isExpanded)
+        // if (!isExpanded)
+        // {
+        //     TogglePanel();
+        // }
+    }
+
+    private void SetSelectedItem(int index)
+    {
+        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
         {
-            TogglePanel();
+            items[this.selectedItem].Deselect();
         }
+
+        this.selectedItem = index;
+        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+        {
+            items[this.selectedItem].Select();
+            GameObject clone = Instantiate(items[this.selectedItem].go);
+
+            int previewLayer = LayerMask.NameToLayer("Preview");
+            clone.layer = previewLayer;
+            clone.SetActive(true);
+
+            // Optional: reset local transforms
+            clone.transform.position = Vector3.zero;
+            clone.transform.rotation = Quaternion.identity;
+            
+            PreviewItem(items[this.selectedItem].partId, items[this.selectedItem].description, items[this.selectedItem].colorName, clone);
+
+        }        
+    }
+
+    public void Expand(int selectedItem = 0, bool shrinkable = true)
+    {
+        if (isExpanded)
+        {
+            SetSelectedItem(selectedItem);
+        }
+        else
+        {
+            TogglePanel(true, selectedItem, shrinkable);
+        }
+        
     }
 
     public void SetItemCount(int itemCount)
@@ -103,58 +148,60 @@ public class LeftPanelToggle : MonoBehaviour
         cam.rect = new Rect(viewportX, 0, viewportWidth, 1);
 
         partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth + columnWidth, 0);
-
-        if (isExpanded)
-        {
-            TogglePanel();
-        }
-        else
-        {
-            Shrink();
-        }        
     }
 
-    // void SetButtonColor(Color color)
-    // {
-    //     var colors = button.colors;
-    //     colors.normalColor = color; 
-    //     button.colors = colors;
-    // }
-
-    void Shrink()
+    public void ShrinkPanel()
     {
-        sidePanel.sizeDelta = new Vector2(panelWidth, sidePanel.sizeDelta.y);
-        // arrowImage.localEulerAngles = new Vector3(0, 0, -90);
-        // SetButtonColor(buttonColor);
-        partDetail.SetActive(false);
-        expander.SetActive(false);
-        DestoryPreviewPart();
-        //sidePanel.offsetMax = new Vector2(collapsedWidth - Screen.width, sidePanel.offsetMax.y);
+        Shrink(null);
+    }
+
+    public void Shrink(Action action)
+    {
+        TogglePanel(false, -1, false, action);
     }
 
     // Call this method from the Button onClick event
-    public void TogglePanel()
+    public void TogglePanel(bool expand, int selectedItem, bool shinkable, Action action = null)
     {
-        isExpanded = !isExpanded;
+        // isExpanded = !isExpanded;
 
-        if (!isExpanded)
+        if (!expand)
         {
             DestoryPreviewPart();
         }
 
-        float targetWidth = isExpanded ? Screen.width : panelWidth;
+        float targetWidth = expand ? Screen.width : panelWidth;
 
         // Animate width change (optional)
-        StartCoroutine(AnimateWidth(sidePanel, targetWidth, isExpanded));
+        StartCoroutine(AnimateWidth(sidePanel, targetWidth, expand, selectedItem, shinkable, action));
+        isExpanded = expand;
 
         // Rotate the arrow 180 degrees around Z to flip it
         // arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 90) : new Vector3(0, 0, -90);
         // SetButtonColor(isExpanded ? selectedColor : buttonColor);
     }
 
-    private IEnumerator AnimateWidth(RectTransform panel, float targetWidth, bool isExpanded)
+    public void AddItem(Sprite icon, string label, string partId, string description, string colorName, GameObject go)
     {
-        if (!isExpanded)
+        // Create new item under the parent
+        GameObject obj = Instantiate(gridItemPrefab, gridParent);
+
+        // Get the UI script from the prefab
+        PartGridItem itemUI = obj.GetComponent<PartGridItem>();
+        int index = items.Count;
+        items.Add(itemUI);
+
+        // var go = navigator.GetPartFromCurrentStep(index);
+        itemUI.SetContent(icon, label, go, ()=>
+            {
+                Expand(index, true);
+            }, partId, description, colorName);
+    }
+
+    private IEnumerator AnimateWidth(RectTransform panel, float targetWidth, bool expand, int selectedItem, bool shinkable, Action action)
+    {
+        SetSelectedItem(selectedItem);
+        if (!expand)
         {
             partDetail.SetActive(false);
         }
@@ -172,12 +219,13 @@ public class LeftPanelToggle : MonoBehaviour
 
         panel.sizeDelta = new Vector2(targetWidth, sidePanel.sizeDelta.y);
 
-        if (isExpanded)
+        if (expand)
         {
             partDetail.SetActive(true);
         }
 
-        expander.SetActive(isExpanded);
+        expander.SetActive(expand && shinkable);
+        action?.Invoke();
     }
 
     private void HandleInput()
@@ -186,6 +234,15 @@ public class LeftPanelToggle : MonoBehaviour
         {
             inputHandler.HandleInput();
         }        
+    }
+
+    public void ClearGrid()
+    {
+        items.Clear();
+        foreach (Transform child in gridParent)
+        {
+            Destroy(child.gameObject);
+        }
     }
 
     public void Update()

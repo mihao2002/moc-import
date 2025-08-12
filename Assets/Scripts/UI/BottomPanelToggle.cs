@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections;
 using System;
+using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class BottomPanelToggle : MonoBehaviour
 {
@@ -11,7 +13,8 @@ public class BottomPanelToggle : MonoBehaviour
     public RectTransform next;
     public RectTransform stepNumber;
     public RectTransform expander;
-    public RectTransform slider;
+    public RectTransform sliderTrans;
+    public Slider slider;
     public GameObject stepPrefab;
     public Transform stepListParent;
     
@@ -20,6 +23,9 @@ public class BottomPanelToggle : MonoBehaviour
 
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
+
+    private int selectedItem = -1;
+    private List<PartGridItem> items = new List<PartGridItem>();
     
     void Awake()
     {
@@ -39,10 +45,26 @@ public class BottomPanelToggle : MonoBehaviour
         stepNumber.anchoredPosition = new Vector2(-padding, stepNumber.anchoredPosition.y);
 
         // Set left gap to 20
-        slider.offsetMin = new Vector2(uiManager.BaseUnit, slider.offsetMin.y);
-        slider.offsetMax = new Vector2(-uiManager.BaseUnit, slider.offsetMax.y);
+        sliderTrans.offsetMin = new Vector2(uiManager.BaseUnit, sliderTrans.offsetMin.y);
+        sliderTrans.offsetMax = new Vector2(-uiManager.BaseUnit, sliderTrans.offsetMax.y);
 
         Hide();
+    }
+
+    public void SetSelectedItem(int index)
+    {
+        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+        {
+            items[this.selectedItem].Deselect();
+        }
+
+        this.selectedItem = index;
+        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+        {
+            items[this.selectedItem].Select();
+            slider.value = (float)index/(items.Count-1);
+            Debug.LogError($"SetSelectedItem {index} {slider.value}");
+        }        
     }
 
     public void AddStep(Sprite sprite, int step, Action action)
@@ -53,7 +75,9 @@ public class BottomPanelToggle : MonoBehaviour
         rt.sizeDelta = new Vector2(itemSize, itemSize);
         PartGridItem itemUI = obj.GetComponent<PartGridItem>();
 
-        itemUI.SetContent(sprite, $"{step+1}", action);
+        items.Add(itemUI);
+
+        itemUI.SetContent(sprite, $"{step+1}", null, action);
     }
 
     void Hide()

@@ -1415,8 +1415,6 @@ MonoBehaviour:
   navigationText: {fileID: 1218004574}
   stepNumberText: {fileID: 1117896591}
   mainCamera: {fileID: 367986510}
-  gridItemPrefab: {fileID: 4933899295792351037, guid: bd330aa4393f1be40a35b9dd5b0d815a, type: 3}
-  gridParent: {fileID: 674575176}
   leftPaneToggle: {fileID: 2015060210}
   bottomPaneToggle: {fileID: 1398410672}
   stepListParent: {fileID: 1046760380}
@@ -2179,7 +2177,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 2015060210}
         m_TargetAssemblyTypeName: LeftPanelToggle, Assembly-CSharp
-        m_MethodName: TogglePanel
+        m_MethodName: ShrinkPanel
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2339,7 +2337,8 @@ MonoBehaviour:
   next: {fileID: 338576081}
   stepNumber: {fileID: 1117896590}
   expander: {fileID: 1543143691}
-  slider: {fileID: 687869135}
+  sliderTrans: {fileID: 687869135}
+  slider: {fileID: 687869136}
   stepPrefab: {fileID: 4933899295792351037, guid: 15dcf988adc2f2745bd5f6b7b4dcde66, type: 3}
   stepListParent: {fileID: 1046760380}
   animationDuration: 0.2
@@ -3239,6 +3238,8 @@ MonoBehaviour:
   partDescriptions: {fileID: 166584411}
   partImageContainer: {fileID: 199964420}
   partInfo: {fileID: 453387702}
+  gridItemPrefab: {fileID: 4933899295792351037, guid: bd330aa4393f1be40a35b9dd5b0d815a, type: 3}
+  gridParent: {fileID: 674575176}
   animationDuration: 0.2
 --- !u!1 &2138356078
 GameObject:

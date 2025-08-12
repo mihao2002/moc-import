@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System;
+using System.Collections.Generic;
 
 namespace LDraw.Runtime
 {
@@ -19,10 +20,14 @@ namespace LDraw.Runtime
         private Vector3 cameraCenter;
         private float cameraRadius;
         private Vector3 currentRotationEuler;
+        private bool animateEnabled;
+        private int currentTag;
+
+        private Dictionary<int, (Vector3 /*center*/, Vector3 /*position*/, Vector3 /*up*/)> tagStates;
         
         // private static readonly Vector3 LookTarget = Vector3.zero;
 
-        public LDrawCamera(Camera camera)
+        public LDrawCamera(Camera camera, bool animate)
         {
             cam = camera;
             cam.orthographic = false;
@@ -30,6 +35,12 @@ namespace LDraw.Runtime
             cam.transform.rotation = headOnRotation; // IsometricRotation;
             cameraCenter = Vector3.zero;
             currentRotationEuler = Vector3.zero;
+            this.animateEnabled = animate;
+            currentTag = -1;
+
+            // animator = cam.GetComponent<CameraAnimator>();
+
+            tagStates = new Dictionary<int, (Vector3, Vector3, Vector3)>();
 
             RemoveAllLightsUnderCamera();
             CreateDirectionalLight("LDCad_Light1", new Vector3(30, 30, 0));
@@ -78,9 +89,9 @@ namespace LDraw.Runtime
             light.shadows = LightShadows.None; // Optional: disable shadows for clarity
         }
 
-        public void SetCamera(Vector3 center, float radius, Vector3? rotation, bool animate = false, Action onAnimationComplete = null)
+        public void SetCamera(Vector3 center, float radius, Vector3? rotation, bool animate = false, Action onAnimationComplete = null, int tag = -1, bool cleanState = false)
         {
-            var oldCenter = cameraCenter;
+            // var oldCenter = cameraCenter;
             cameraCenter = center;
             cameraRadius = radius;
 
@@ -126,9 +137,24 @@ namespace LDraw.Runtime
                 targetPos = center - direction * distance;
             }
 
-            if (animate)
+            if (animateEnabled) Debug.LogError($"SetCamera {tag}");
+
+            if (tag == -1)
             {
-                animator.AnimateTo(oldCenter, cameraCenter, cam.transform.position, targetPos, cam.transform.up, up ?? cam.transform.up, onAnimationComplete);
+                tag = currentTag;
+            }
+            else
+            {
+                currentTag = tag;
+            }
+
+            if (cleanState) currentTag = -1;
+
+            if (animateEnabled && animate && tagStates.ContainsKey(tag))
+            {
+                if (animateEnabled) Debug.LogError($"Read {tag} {tagStates[tag]}");
+                (Vector3 oldCenter, Vector3 oldPosition, Vector3 oldUp) = tagStates[tag];
+                animator.AnimateTo(tag, tagStates, cleanState, oldCenter, cameraCenter, oldPosition, targetPos, oldUp, up ?? cam.transform.up, onAnimationComplete);
             }
             else
             {
@@ -137,8 +163,21 @@ namespace LDraw.Runtime
                 {
                     cam.transform.LookAt(center, up.Value);
                 }
-                onAnimationComplete?.Invoke();
+
+                if (animateEnabled && tag != -1)
+                {
+                    if (animateEnabled) Debug.LogError($"Write1 {tag}");
+                    if (!cleanState)
+                        tagStates[tag] = (center, targetPos, up ?? cam.transform.up);
+                    else
+                    {
+                        Debug.LogError($"CleanState {tag}");
+                        tagStates.Remove(tag);
+                    }
+                        
+                }
                 
+                onAnimationComplete?.Invoke();                
             }
         }
 
@@ -159,7 +198,8 @@ namespace LDraw.Runtime
                 return anim;
             }
 
-            public void AnimateTo(Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, Action onComplete)
+            public void AnimateTo(int tag, Dictionary<int, (Vector3, Vector3, Vector3)> tagStates, bool cleanState,
+                Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, Action onComplete)
             {
                 if (animationCoroutine != null)
                 {
@@ -171,10 +211,11 @@ namespace LDraw.Runtime
 
                 float duration = Mathf.Clamp((distance + angle * 0.05f) * 0.2f, 0.2f, 2.0f); // tweak as needed
                     
-                animationCoroutine = StartCoroutine(Animate(startCenter, center, startPos, targetPos, startUp, endUp, duration, onComplete));
+                animationCoroutine = StartCoroutine(Animate(tag, tagStates, cleanState, startCenter, center, startPos, targetPos, startUp, endUp, duration, onComplete));
             }
 
-            private IEnumerator Animate(Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, float duration, Action onComplete)
+            private IEnumerator Animate(int tag, Dictionary<int, (Vector3, Vector3, Vector3)> tagStates, bool cleanState,
+                Vector3 startCenter, Vector3 center, Vector3 startPos, Vector3 targetPos, Vector3 startUp, Vector3 endUp, float duration, Action onComplete)
             {
                 Vector3 startDir = (startPos - startCenter).normalized;
                 Vector3 endDir = (targetPos - center).normalized;
@@ -211,6 +252,19 @@ namespace LDraw.Runtime
                 // Ensure exact final position and rotation
                 cam.transform.position = targetPos;
                 cam.transform.rotation = Quaternion.LookRotation(center - targetPos, endUp);
+
+                if (tag != -1)
+                {
+                    Debug.LogError($"Write2 {tag}");
+                    if (!cleanState)
+                        tagStates[tag] = (center, targetPos, endUp);
+                    else
+                    {
+                        Debug.LogError($"CleanState {tag}");
+                        tagStates.Remove(tag);
+                    }
+                        
+                }
 
                 onComplete?.Invoke();
             }

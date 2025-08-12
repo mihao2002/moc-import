@@ -147,33 +147,6 @@ namespace LDraw.Editor
                 
                 EditorGUILayout.Space();
             }
-
-            if (navigator != null)
-            {
-                var (currentModel, currentStep, stepCount) = navigator.GetCurrentStep();
-
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField($"Model: {currentModel} | Step: {currentStep + 1} / {stepCount}");
-                EditorGUILayout.BeginHorizontal();
-
-                EditorGUI.BeginDisabledGroup(navigator.IsAtStart);
-                if (GUILayout.Button("Previous Step"))
-                {
-                    navigator.ShowPreviousStep();
-                    SceneView.RepaintAll();
-                }
-                EditorGUI.EndDisabledGroup();
-                
-                EditorGUI.BeginDisabledGroup(navigator.IsAtEnd);
-                if (GUILayout.Button("Next Step"))
-                {
-                    navigator.ShowNextStep();
-                    SceneView.RepaintAll();
-                }
-                EditorGUI.EndDisabledGroup();
-
-                EditorGUILayout.EndHorizontal();
-            }
         }
 
         private IEnumerator<YieldInstruction> LoadLDrawFileCoroutine()
@@ -422,20 +395,21 @@ namespace LDraw.Editor
 
                     var stepGO = modelContainer.AddStep(objs);
                     var bounds = LDrawUtils.CalculateBounds(stepGO);
-                    // if (!initialized)
-                    // {
-                    //     modelBounds = bounds;
-                    //     initialized = true;
-                    // }
-                    // else
-                    // {
-                    //     modelBounds.Encapsulate(bounds);
-                    // }
+                    if (!initialized)
+                    {
+                        modelBounds = bounds;
+                        initialized = true;
+                    }
+                    else
+                    {
+                        modelBounds.Encapsulate(bounds);
+                    }
                     
                     // step.center = modelBounds.center;
                     // step.radius = modelBounds.extents.magnitude;
                     step.center = bounds.center;
                     step.radius = bounds.extents.magnitude;
+                    step.modelBounds = modelBounds;
 
                     if (isCancelled) yield break;
                 }
@@ -452,16 +426,16 @@ namespace LDraw.Editor
             yield return null;
             
             var previewCount = flatSteps.Count;
-            var previewNavigator = new LDrawFlatStepNavigator(models, ldrawCamera, flatSteps, false);
+            var previewNavigator = new LDrawFlatStepNavigator(models, ldrawCamera, flatSteps, true);
             for (var i=0; i<previewCount; i++)
             {
                 OnProgressUpdate((i+1.0f)/previewCount, $"Creating preview for step {i+1}...");
                 yield return null;
+                previewNavigator.GotoStep(i, false);
                 CreateStepImage(i, ldrawCamera, rt);
-                previewNavigator.ShowNextStep(false);
             }
 
-            navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera), flatSteps);
+            navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera, false), flatSteps);
             OnProgressUpdate(1f, "Done");
             yield return null;    
 
@@ -484,7 +458,7 @@ namespace LDraw.Editor
             cam.nearClipPlane = 0.01f;
             cam.farClipPlane = 1000f;
 
-            return new LDrawCamera(cam);
+            return new LDrawCamera(cam, false);
         }
 
         public static void CreateImage(string filename, GameObject go, LDrawCamera camera, RenderTexture rt)
