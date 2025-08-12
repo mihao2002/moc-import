@@ -63,7 +63,6 @@ public class BottomPanelToggle : MonoBehaviour
         {
             items[this.selectedItem].Select();
             slider.value = (float)index/(items.Count-1);
-            Debug.LogError($"SetSelectedItem {index} {slider.value}");
         }        
     }
 

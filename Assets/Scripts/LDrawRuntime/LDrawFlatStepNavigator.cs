@@ -165,7 +165,6 @@ namespace LDraw.Runtime
             }
             
             canNavigate = false;
-            // Debug.LogError($"ShowFlatStep show:{shownModel} current:{currentModel}");
             ldrawCamera.SetCamera(center, radius, rotation, animateStep, 
                 () =>
                 {

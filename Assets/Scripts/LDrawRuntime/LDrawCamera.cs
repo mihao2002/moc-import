@@ -137,8 +137,6 @@ namespace LDraw.Runtime
                 targetPos = center - direction * distance;
             }
 
-            if (animateEnabled) Debug.LogError($"SetCamera {tag}");
-
             if (tag == -1)
             {
                 tag = currentTag;
@@ -152,7 +150,6 @@ namespace LDraw.Runtime
 
             if (animateEnabled && animate && tagStates.ContainsKey(tag))
             {
-                if (animateEnabled) Debug.LogError($"Read {tag} {tagStates[tag]}");
                 (Vector3 oldCenter, Vector3 oldPosition, Vector3 oldUp) = tagStates[tag];
                 animator.AnimateTo(tag, tagStates, cleanState, oldCenter, cameraCenter, oldPosition, targetPos, oldUp, up ?? cam.transform.up, onAnimationComplete);
             }
@@ -166,12 +163,10 @@ namespace LDraw.Runtime
 
                 if (animateEnabled && tag != -1)
                 {
-                    if (animateEnabled) Debug.LogError($"Write1 {tag}");
                     if (!cleanState)
                         tagStates[tag] = (center, targetPos, up ?? cam.transform.up);
                     else
                     {
-                        Debug.LogError($"CleanState {tag}");
                         tagStates.Remove(tag);
                     }
                         
@@ -255,12 +250,10 @@ namespace LDraw.Runtime
 
                 if (tag != -1)
                 {
-                    Debug.LogError($"Write2 {tag}");
                     if (!cleanState)
                         tagStates[tag] = (center, targetPos, endUp);
                     else
                     {
-                        Debug.LogError($"CleanState {tag}");
                         tagStates.Remove(tag);
                     }
                         
