@@ -37,6 +37,7 @@ namespace LDraw.Runtime
         private Material mainMaterial;
 
         private bool showParts = true;
+        private int partListStep = -1;
         private int currentStep = 0;
 
         void Start()
@@ -75,9 +76,13 @@ namespace LDraw.Runtime
 
         private void ShowCurrentStep()
         {
-            if (showParts)
-            {                
+            if (partListStep != currentStep)
+            {
                 PopulateStepParts();
+            }
+
+            if (showParts)
+            {              
                 leftPaneToggle.Expand(0, false);                
             }
             else
@@ -130,12 +135,13 @@ namespace LDraw.Runtime
 
         private void PopulateStepParts()
         {
+            //Dictionary<LDrawPartCore, int>
             var parts = navigator.GetStepParts(currentStep);
             var partCounts = new Dictionary<Sprite, int>();
             var partInfo = new Dictionary<Sprite, Tuple<string, string, string, int>>();
-            for (var i=0; i<parts.Count; i++)
-            {                
-                var part = parts[i];
+            foreach (var kvp in parts)
+            {
+                var part = kvp.Key;                
                 var isModel = modelNames.Contains(part.partId);
                 string spriteKey = $"{part.partId.Replace('\\','_')}";
                 string colorName = null;
@@ -150,17 +156,11 @@ namespace LDraw.Runtime
 
                 if (partSpriteDict.ContainsKey(spriteKey))
                 {
+                    var idx = partCounts.Count;
                     var sprite = partSpriteDict[spriteKey];
-                    if (partCounts.ContainsKey(sprite))
-                    {
-                        partCounts[sprite]+=1;
-                    }
-                    else
-                    {
-                        partCounts[sprite]=1;
-                        var description = partDescriptions.ContainsKey(part.partId) ? partDescriptions[part.partId] : null;
-                        partInfo[sprite] = new Tuple<string, string, string, int>(id, description, colorName, i);
-                    }
+                    partCounts[sprite]=kvp.Value;
+                    var description = partDescriptions.ContainsKey(part.partId) ? partDescriptions[part.partId] : null;
+                    partInfo[sprite] = new Tuple<string, string, string, int>(id, description, colorName, idx);
                 }
                 else
                 {
@@ -176,6 +176,7 @@ namespace LDraw.Runtime
             }
 
             leftPaneToggle.SetItemCount(partCounts.Count);
+            partListStep = currentStep;
         }
 
         private bool CanNavigate
@@ -219,7 +220,7 @@ namespace LDraw.Runtime
                     if (currentStep < navigator.TotalStep - 1)
                     {
                         currentStep++;
-                        showParts = true;
+                        showParts = navigator.GetStepParts(currentStep).Count > 0;
                     }
                 }
 
@@ -232,7 +233,7 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                if (!showParts)
+                if (!showParts && navigator.GetStepParts(currentStep).Count > 0)
                 {
                     showParts = true;
                 }
@@ -327,7 +328,7 @@ namespace LDraw.Runtime
                 bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, ()=>
                 {
                     currentStep = stepIdx;
-                    showParts = true;
+                    showParts = navigator.GetStepParts(stepIdx).Count > 0;;
                     ShowCurrentStep(); 
                 });
             }

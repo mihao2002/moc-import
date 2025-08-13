@@ -15,12 +15,37 @@ namespace LDraw.Runtime
     }
 
     [Serializable]
-    public class LDrawPart
+    public class LDrawBuildMod
+    {
+        public int step;
+        public int start;
+        public int end;
+    }
+
+    [Serializable]
+    public class LDrawPartCore
     {
         public string partId;
+        public int color;
+
+        public override bool Equals(object obj)
+        {
+            return obj is LDrawPart other &&
+                    partId == other.partId &&
+                    color == other.color;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(partId, color);
+        }
+    }
+
+    [Serializable]
+    public class LDrawPart: LDrawPartCore
+    {
         public Vector3 position;
         public Quaternion rotation;
-        public int color;
     }
 
     [Serializable]
@@ -44,6 +69,7 @@ namespace LDraw.Runtime
         public string modelName;
         public List<LDrawStep> steps;
         public ModelContainer container;
+        public Dictionary<int /*removestep*/, LDrawBuildMod> buildMods;
     }   
 
     [Serializable]

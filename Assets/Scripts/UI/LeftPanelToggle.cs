@@ -142,7 +142,7 @@ public class LeftPanelToggle : MonoBehaviour
     {
         var columnCount = Mathf.CeilToInt(itemCount / (float)fixRowCount);
 
-        panelWidth = columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding * 2;
+        panelWidth = columnCount == 0 ? 0 : columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding * 2;
         float viewportX = panelWidth / Screen.width;
         float viewportWidth = 1.0f - viewportX;
         cam.rect = new Rect(viewportX, 0, viewportWidth, 1);

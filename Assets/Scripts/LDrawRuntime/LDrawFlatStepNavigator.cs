@@ -72,13 +72,47 @@ namespace LDraw.Runtime
             }
         }
 
-        public List<LDrawPart> GetStepParts(int step)
+        public Dictionary<LDrawPartCore, int> GetStepParts(int step)
         {
             var flatStep = flatSteps[step];
             var model = models[flatStep.model];
             var modelSteps = model.steps;
             var stepIdx = flatStep.modelStepIdx;
-            return modelSteps[stepIdx].parts;
+            var parts = modelSteps[stepIdx].parts;
+
+            var results = new Dictionary<LDrawPartCore, int>();
+            foreach (var part in parts)
+            {
+                if (results.ContainsKey(part))
+                {
+                    results[part] += 1;
+                }
+                else
+                {
+                    results[part] = 1;
+                }
+            }
+
+            var buildMods = model.buildMods;
+            if (buildMods.ContainsKey(flatStep.modelStepIdx))
+            {
+                var buildMod = buildMods[flatStep.modelStepIdx];
+                var refStepParts= modelSteps[buildMod.step].parts;
+                for (var i=buildMod.start; i<= buildMod.end; i++)
+                {
+                    var part = refStepParts[i];
+                    if (results.ContainsKey(part))
+                    {
+                        results[part]--;
+                        if (results[part] == 0)
+                        {
+                            results.Remove(part);
+                        }
+                    }
+                }
+            }
+
+            return results;
         }
 
         public GameObject GetPartFromStep(int step, int index)
@@ -113,6 +147,20 @@ namespace LDraw.Runtime
             {
                 HideShownModel();               
             }
+        }
+
+        private void ShowHideStepParts(Dictionary<int, LDrawBuildMod> buildMods, ModelContainer modelContainer, int step)
+        {
+            if (buildMods.Count > 0)
+            {
+                modelContainer.ShowAllStepParts(step);
+            }
+
+            if (buildMods.ContainsKey(step))
+            {
+                var buildMod = buildMods[step];
+                modelContainer.HideStepParts(buildMod.step, buildMod.start, buildMod.end);
+            }            
         } 
 
         private void ShowFlatStep(int step1, bool animateStep = true)
@@ -122,6 +170,7 @@ namespace LDraw.Runtime
 
             var flatStep = flatSteps[step1];
             var model = models[flatStep.model];
+            var buildMods = model.buildMods;
 
             var modelContainer = model.container;
 
@@ -134,6 +183,7 @@ namespace LDraw.Runtime
             // Show steps up to stepIdx-1
             for (int i = 0; i <= stepIdx-1; i++)
             {
+                ShowHideStepParts(buildMods, modelContainer, i);
                 modelContainer.ShowStep(i, true);
             }
 
@@ -168,6 +218,7 @@ namespace LDraw.Runtime
             ldrawCamera.SetCamera(center, radius, rotation, animateStep, 
                 () =>
                 {
+                    ShowHideStepParts(buildMods, modelContainer, stepIdx);
                     modelContainer.ShowStep(stepIdx, true);
                     canNavigate = true;
                 }, shownModel, lastStepOfModel);

@@ -16,6 +16,33 @@ namespace LDraw.Runtime
             modelContainer.SetActive(false); // Hide by default
         }
 
+        public void ShowAllStepParts(int step)
+        {
+            var stepContainer = stepContainers[step];
+            int childCount = stepContainer.transform.childCount;
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = stepContainer.transform.GetChild(i);
+                child.gameObject.SetActive(true);
+            }
+        }
+
+        public void HideStepParts(int step, int start, int end)
+        {
+            var stepContainer = stepContainers[step];
+
+            int childCount = stepContainer.transform.childCount;
+            // Clamp start and end to valid range to avoid errors
+            int clampedStart = Mathf.Max(0, start);
+            int clampedEnd = Mathf.Min(end, childCount - 1);
+
+            for (int i = clampedStart; i <= clampedEnd; i++)
+            {
+                var child = stepContainer.transform.GetChild(i);
+                child.gameObject.SetActive(false);
+            }
+        }
+
         public GameObject AddStep(List<GameObject> stepObjects)
         {
             GameObject stepContainer = new GameObject($"Step_{stepContainers.Count}");

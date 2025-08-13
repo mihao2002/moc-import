@@ -49,12 +49,13 @@ namespace LDraw.Editor
             foreach (var (name, start, end) in fileSections)
             {
                 if (mainModelName == null) mainModelName = name;
-                var steps = ParseStepsFromLines(lines, start, end, modelNames);
+                (List<LDrawStep> steps, Dictionary<int, LDrawBuildMod> buildMods) = ParseStepsFromLines(lines, start, end, modelNames);
                 if (steps.Count > 0)
                 {
                     var modelData = new RuntimeModelData{
                         modelName = name,
-                        steps = steps};
+                        steps = steps,
+                        buildMods = buildMods};
                     models.Add(modelData);                    
                 }
                 else
@@ -72,12 +73,17 @@ namespace LDraw.Editor
         }
 
         // Helper: Parse a range of lines into steps
-        private static List<LDrawStep> ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
+        private static (List<LDrawStep>, Dictionary<int, LDrawBuildMod>) ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
         {
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
             var hasModelInStep = false;
             var currentRotationRef = -1;
+            string modName = null;
+            int modStart=0;
+
+            Dictionary<string, LDrawBuildMod> modInfo = new Dictionary<string, LDrawBuildMod>();
+            Dictionary<int, LDrawBuildMod> buildMods = new Dictionary<int, LDrawBuildMod>();
 
             for (int i = start; i < end; i++)
             {
@@ -85,7 +91,7 @@ namespace LDraw.Editor
                 if (line.StartsWith("3 ") || line.StartsWith("4 "))
                 {
                     // This is a geometry part
-                    return steps;
+                    return (steps, buildMods);
                 }
             }
 
@@ -134,6 +140,38 @@ namespace LDraw.Editor
                             currentStep = new LDrawStep();
                             hasModelInStep = false;
                         }
+                        else if (directive == "!LPUB" && tokens.Length > 3 && tokens[2].ToUpper() == "BUILD_MOD")
+                        {
+                            var type = tokens[3].ToUpper();
+                            if (type == "BEGIN")
+                            {
+                                if (tokens.Length > 4)
+                                {                                    
+                                    modName = tokens[4];
+                                    modStart = currentStep.parts.Count;
+                                }
+                            }
+                            else if (type == "END_MOD")
+                            {
+                                if (modName != null)
+                                {
+                                    var mod = new LDrawBuildMod{step=steps.Count, start=modStart, end=currentStep.parts.Count-1};
+                                    modInfo[modName] = mod;
+                                    modName = null;
+                                }
+                            }
+                            else if (type == "REMOVE")
+                            {
+                                if (tokens.Length > 4)
+                                {
+                                    var name = tokens[4];
+                                    if (modInfo.ContainsKey(name))
+                                    {
+                                        buildMods[steps.Count] = modInfo[name];
+                                    }
+                                }                              
+                            }
+                        }
                     }
                 }
                 else if (line.StartsWith("1 "))
@@ -181,7 +219,7 @@ namespace LDraw.Editor
                 }
             }
                 
-            return steps;
+            return (steps, buildMods);
         }
 
         public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, 
