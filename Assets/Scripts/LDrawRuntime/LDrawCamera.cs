@@ -22,6 +22,7 @@ namespace LDraw.Runtime
         private Vector3 currentRotationEuler;
         private bool animateEnabled;
         private int currentTag;
+        private float nearClip;
 
         private Dictionary<int, (Vector3 /*center*/, Vector3 /*position*/, Vector3 /*up*/)> tagStates;
         
@@ -34,6 +35,7 @@ namespace LDraw.Runtime
             cam.fieldOfView = 60f;
             cam.transform.rotation = headOnRotation; // IsometricRotation;
             cameraCenter = Vector3.zero;
+            nearClip = cam.nearClipPlane;
             currentRotationEuler = Vector3.zero;
             this.animateEnabled = animate;
             currentTag = -1;
@@ -106,7 +108,8 @@ namespace LDraw.Runtime
             float distanceH = radius / Mathf.Sin(horizontalFOV / 2f);
 
             // Use the larger one to ensure full fit
-            float distance = Mathf.Max(distanceV, distanceH) * 1.2f;
+            float distance = Mathf.Max(distanceV, distanceH);
+            distance = Mathf.Max(distance + nearClip, distance * 1.2f);
             Vector3 targetPos;
             Vector3? up = null;
 
