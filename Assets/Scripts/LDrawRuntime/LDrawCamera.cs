@@ -23,6 +23,7 @@ namespace LDraw.Runtime
         private bool animateEnabled;
         private int currentTag;
         private float nearClip;
+        private Vector3 up;
 
         private Dictionary<int, (Vector3 /*center*/, Vector3 /*position*/, Vector3 /*up*/)> tagStates;
         
@@ -39,6 +40,7 @@ namespace LDraw.Runtime
             currentRotationEuler = Vector3.zero;
             this.animateEnabled = animate;
             currentTag = -1;
+            up = cam.transform.up;
 
             // animator = cam.GetComponent<CameraAnimator>();
 
@@ -56,9 +58,9 @@ namespace LDraw.Runtime
             cam.Render();
         }
 
-        public (Vector3 center, float radius, Vector3 rotationEuler) GetCameraState()
+        public (Vector3 center, float radius, Vector3 rotationEuler, Vector3 up) GetCameraState()
         {
-            return (cameraCenter, cameraRadius, currentRotationEuler);
+            return (cameraCenter, cameraRadius, currentRotationEuler, up);
         }
 
         void RemoveAllLightsUnderCamera()
@@ -111,7 +113,7 @@ namespace LDraw.Runtime
             float distance = Mathf.Max(distanceV, distanceH);
             distance = Mathf.Max(distance + nearClip, distance * 1.2f);
             Vector3 targetPos;
-            Vector3? up = null;
+            // Vector3? up = null;
 
             if (rotation.HasValue)
             {
@@ -154,20 +156,20 @@ namespace LDraw.Runtime
             if (animateEnabled && animate && tagStates.ContainsKey(tag))
             {
                 (Vector3 oldCenter, Vector3 oldPosition, Vector3 oldUp) = tagStates[tag];
-                animator.AnimateTo(tag, tagStates, cleanState, oldCenter, cameraCenter, oldPosition, targetPos, oldUp, up ?? cam.transform.up, onAnimationComplete);
+                animator.AnimateTo(tag, tagStates, cleanState, oldCenter, cameraCenter, oldPosition, targetPos, oldUp, up, onAnimationComplete);
             }
             else
             {
                 cam.transform.position = targetPos;
                 if (up != null)
                 {
-                    cam.transform.LookAt(center, up.Value);
+                    cam.transform.LookAt(center, up);
                 }
 
                 if (animateEnabled && tag != -1)
                 {
                     if (!cleanState)
-                        tagStates[tag] = (center, targetPos, up ?? cam.transform.up);
+                        tagStates[tag] = (center, targetPos, up);
                     else
                     {
                         tagStates.Remove(tag);

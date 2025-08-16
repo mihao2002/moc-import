@@ -32,17 +32,27 @@ namespace LDraw.Runtime
         {
             float rotationSpeed = 0.2f;
 
-            (Vector3 center, float radius, Vector3 rotationEuler) = camera.GetCameraState();
-            rotationEuler.y -= delta.x * rotationSpeed;
+            var (center, radius, rotationEuler, up) = camera.GetCameraState();
+            
             rotationEuler.x -= delta.y * rotationSpeed;
-            //rotationEuler.x = Mathf.Clamp(rotationEuler.x, -89f, 89f);
+
+            var a = To360(rotationEuler.x);
+            var dir = a > 90f && a < 270f;
+            rotationEuler.y -= delta.x * rotationSpeed * (dir?-1:1);
 
             camera.SetCamera(center, radius, rotationEuler);
         }
 
+        float To360(float angle)
+        {
+            angle %= 360f;           // now in (-360, 360)
+            if (angle < 0) angle += 360f;  // shift negatives into [0, 360)
+            return angle;
+        }
+
         private void ApplyZoomDelta(float delta)
         {
-            var (center, radius, rotationEuler) = camera.GetCameraState();
+            var (center, radius, rotationEuler, up) = camera.GetCameraState();
 
             radius -= delta;
             if (radius >= minRadius && radius <= maxRadius)
