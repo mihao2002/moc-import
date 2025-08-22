@@ -32,7 +32,7 @@ namespace LDraw.Runtime
         private LDrawFlatStepNavigator navigator;
         private InputHandler inputHandler;
         private Dictionary<int, LDrawColor> colors;
-        private Dictionary<string, string> partDescriptions;
+        private Dictionary<string, LDrawPartDesc> partDescriptions;
         private HashSet<string> modelNames;
         private Material mainMaterial;
 
@@ -159,7 +159,14 @@ namespace LDraw.Runtime
                     var idx = partCounts.Count;
                     var sprite = partSpriteDict[spriteKey];
                     partCounts[sprite]=kvp.Value;
-                    var description = partDescriptions.ContainsKey(part.partId) ? partDescriptions[part.partId] : null;
+                    string description = null;
+                    if (partDescriptions.ContainsKey(part.partId))
+                    {
+                        var desc = partDescriptions[part.partId];
+                        id = desc.id ?? id;
+                        description = desc.description;
+                    }
+                    
                     partInfo[sprite] = new Tuple<string, string, string, int>(id, description, colorName, idx);
                 }
                 else

@@ -78,12 +78,19 @@ namespace LDraw.Runtime
         public int model; // index of another step whose rotation will be applied in this step, -1 means the default rotation
         public int modelStepIdx; // always set by editor
     }
-    
+
+    [Serializable]
+    public class LDrawPartDesc
+    {
+        public string id;
+        public string description;
+    }
+
     [Serializable]
     public class StepPackage
     {
         public Dictionary<int, LDrawColor> colors;
-        public Dictionary<string, string> partDescriptions;
+        public Dictionary<string, LDrawPartDesc> partDescriptions;
         public List<RuntimeModelData> models;
         public List<FlatStep> flatSteps;
     }  

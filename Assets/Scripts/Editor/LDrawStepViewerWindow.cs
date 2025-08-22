@@ -6,6 +6,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using LDraw.Runtime;
 using System.Linq;
+using UnityEngine.Rendering;
 
 namespace LDraw.Editor
 {
@@ -166,7 +167,7 @@ namespace LDraw.Editor
             OnProgressUpdate(0f, "Parsing models...");
             yield return null;
 
-            (List<RuntimeModelData> models, Dictionary<string, string[]> geometryModels) = LDrawParser.ParseModels(ldrawFilePath);
+            (List<RuntimeModelData> models, Dictionary<string, string[]> geometryModels) = partLoader.ParseModels(ldrawFilePath);
             if (models.Count == 0)
             {
                 Debug.LogError($"No model at all.");
@@ -349,7 +350,7 @@ namespace LDraw.Editor
             var nonPartModels = new List<RuntimeModelData>();
             foreach (var model in models)
             {
-                if (!LDrawParser.partModels.ContainsKey(model.modelName))
+                if (!partLoader.isPartModel(model.modelName))
                     nonPartModels.Add(model);
             }
 
@@ -436,7 +437,8 @@ namespace LDraw.Editor
 
             var flatSteps = new List<FlatStep>();
             GenerateFlatSteps(flatSteps, models, 0, modelNames);
-            LDrawParser.SaveModelsToJsonAsset(models, flatSteps, partLoader.GetUsedColors(), partLoader.GetPartDescriptions());
+
+            partLoader.SaveModelsToJsonAsset(models, flatSteps, partLoader.GetUsedColors(), partLoader.GetPartDescriptions());
 
             OnProgressUpdate(0f, "Creating model step previews...");
             yield return null;

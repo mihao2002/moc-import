@@ -6,6 +6,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using LDraw.Runtime;
 using UnityEngine.Rendering;
+using Newtonsoft.Json;
 
 namespace LDraw.Editor
 {
@@ -18,19 +19,23 @@ namespace LDraw.Editor
     public class LDrawPartLoader
     {
         private Dictionary<int, LDrawColor> colors;
-        private Dictionary<string, (LDrawMesh, string)> partCache = new Dictionary<string, (LDrawMesh, string)>();
+        private Dictionary<string, (LDrawMesh, string, string)> partCache = new Dictionary<string, (LDrawMesh, string, string)>();
         private Dictionary<string, GameObject> submodelCache = new Dictionary<string, GameObject>();
         private Dictionary<string, List<LDrawStep>> models = new Dictionary<string, List<LDrawStep>>();
         private HashSet<int> usedColors;
-        private Dictionary<string, string> partDescriptions;
+        private Dictionary<string, LDrawPartDesc> partDescriptions;
         private Material mainMaterial;
         private int mainColorIndex = 16;
+
+        public string mainModelName = "main.ldr";
+        // public Dictionary<string, (string, string)> partModels = new Dictionary<string, (string, string)>();
+
 
         public LDrawPartLoader(Dictionary<int, LDrawColor> colors)
         {
             this.colors = colors;
             usedColors = new HashSet<int>();
-            partDescriptions = new Dictionary<string, string>();
+            partDescriptions = new Dictionary<string, LDrawPartDesc>();
             mainMaterial = GetOrCreateMaterial(mainColorIndex);
         }
 
@@ -48,11 +53,16 @@ namespace LDraw.Editor
             return usedColorDict;
         }
 
-        public Dictionary<string, string> GetPartDescriptions()
+        public bool isPartModel(string partId)
+        {
+            return partDescriptions.ContainsKey(partId) && partDescriptions[partId].id != null;
+        }
+
+        public Dictionary<string, LDrawPartDesc> GetPartDescriptions()
         {
             return partDescriptions;
-        } 
-        
+        }
+
         public Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
             string meshFolder = "Assets/Resources/LDrawMeshes";
@@ -123,7 +133,7 @@ namespace LDraw.Editor
             else if (submodelCache.ContainsKey(partId))
             {
                 go = GameObject.Instantiate(submodelCache[partId]);
-                setColor = LDrawParser.partModels.ContainsKey(partId);
+                setColor = isPartModel(partId);
             }
             else
             {
@@ -137,7 +147,7 @@ namespace LDraw.Editor
 
                 Renderer rend = go.GetComponent<Renderer>();
                 Material[] sharedMats = rend.sharedMaterials;
-                for (var i=0;i<sharedMats.Length;i++)
+                for (var i = 0; i < sharedMats.Length; i++)
                 {
                     if (sharedMats[i] == mainMaterial)
                     {
@@ -151,11 +161,263 @@ namespace LDraw.Editor
             return go;
         }
 
+        // New: Parse all models and their steps, without recursive expansion
+        public (List<RuntimeModelData>, Dictionary<string, string[]>) ParseModels(string filePath)
+        {
+            var lines = File.ReadAllLines(filePath);
+            var models = new List<RuntimeModelData>();
+            var geometryModels = new Dictionary<string, string[]>();
+            var modelNames = new HashSet<string>();
+            string mainModelName = null;
+            string currentModel = mainModelName;
+            int modelStart = 0;
+            var fileSections = new List<(string name, int start, int end)>();
+
+            // Identify model sections (by 0 FILE ...)
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                if (line.TrimStart().StartsWith("0 FILE ", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Save previous section
+                    if (i > modelStart)
+                    {
+                        fileSections.Add((currentModel, modelStart, i));
+                        modelNames.Add(currentModel);
+                    }
+                    currentModel = line.Trim().Substring(7).Trim().ToLower();
+                    modelStart = i;
+                }
+            }
+
+            // Add last section
+            fileSections.Add((currentModel, modelStart, lines.Length));
+            modelNames.Add(currentModel);
+
+            foreach (var (name, start, end) in fileSections)
+            {
+                if (mainModelName == null) mainModelName = name;
+                (List<LDrawStep> steps, Dictionary<int, LDrawBuildMod> buildMods, string alias, string description) = ParseStepsFromLines(lines, start, end, modelNames);
+                if (alias != null)
+                {
+                    partDescriptions[name] = new LDrawPartDesc { id = alias, description = description };
+                }
+
+                if (steps.Count > 0)
+                {
+                    var modelData = new RuntimeModelData
+                    {
+                        modelName = name,
+                        steps = steps,
+                        buildMods = buildMods
+                    };
+                    models.Add(modelData);
+                }
+                else
+                {
+                    var modelLines = new List<string>();
+                    for (var i = start; i < end; i++)
+                    {
+                        modelLines.Add(lines[i]);
+                    }
+                    geometryModels[name] = modelLines.ToArray();
+                }
+            }
+
+            return (models, geometryModels);
+        }
+
+        // Helper: Parse a range of lines into steps
+        private (List<LDrawStep>, Dictionary<int, LDrawBuildMod>, string, string) ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
+        {
+            var steps = new List<LDrawStep>();
+            var currentStep = new LDrawStep();
+            var hasModelInStep = false;
+            var currentRotationRef = -1;
+            string modName = null;
+            int modStart = 0;
+            string alias = null;
+            string description = null;
+
+            Dictionary<string, LDrawBuildMod> modInfo = new Dictionary<string, LDrawBuildMod>();
+            Dictionary<int, LDrawBuildMod> buildMods = new Dictionary<int, LDrawBuildMod>();
+
+            for (int i = start; i < end; i++)
+            {
+                var line = lines[i];
+                if (line.StartsWith("3 ") || line.StartsWith("4 "))
+                {
+                    // This is a geometry part
+                    return (steps, buildMods, alias, description);
+                }
+            }
+
+            for (int i = start; i < end; i++)
+            {
+                var line = lines[i];
+                if (line.StartsWith("0 "))
+                {
+                    if (line.StartsWith("0 COMMENT"))
+                    {
+                        var comment = line.Substring(10);
+                        var parts = comment.Split(':');
+                        if (parts.Length == 2)
+                        {
+                            alias = parts[0];
+                            description = parts[1];
+                        }
+                    }
+
+                    var tokens = line.Trim().Split(' ');
+                    if (tokens.Length > 1)
+                    {
+                        var directive = tokens[1].ToUpper();
+
+                        // Handle step boundaries (create new step after processing rotation)
+                        if ((directive == "STEP" || directive == "ROTSTEP") && currentStep.parts.Count > 0)
+                        {
+                            // Handle ROTSTEP rotation data first (for current step)
+                            if (directive == "ROTSTEP" && tokens.Length >= 6)
+                            {
+                                var type = tokens[5].ToUpper();
+                                if (type == "END")
+                                {
+                                    currentRotationRef = -1;
+                                    currentStep.rotRef = currentRotationRef; // Vector3.zero; // ROTSTEP END
+                                }
+                                else if (type == "ABS")
+                                {
+                                    currentStep.rotation = new Vector3(
+                                        float.Parse(tokens[2]),
+                                        float.Parse(tokens[3]),
+                                        float.Parse(tokens[4]));
+                                    currentRotationRef = steps.Count;
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"ROTSTEP with unsupported type: {type}. Line: {line}");
+                                }
+                            }
+                            // For normal STEP, just refer to the last rotation step
+                            else
+                            {
+                                currentStep.rotRef = currentRotationRef;
+                            }
+
+                            steps.Add(currentStep);
+                            currentStep = new LDrawStep();
+                            hasModelInStep = false;
+                        }
+                        else if (directive == "!LPUB" && tokens.Length > 3 && tokens[2].ToUpper() == "BUILD_MOD")
+                        {
+                            var type = tokens[3].ToUpper();
+                            if (type == "BEGIN")
+                            {
+                                if (tokens.Length > 4)
+                                {
+                                    modName = tokens[4];
+                                    modStart = currentStep.parts.Count;
+                                }
+                            }
+                            else if (type == "END_MOD")
+                            {
+                                if (modName != null)
+                                {
+                                    var mod = new LDrawBuildMod { step = steps.Count, start = modStart, end = currentStep.parts.Count - 1 };
+                                    modInfo[modName] = mod;
+                                    modName = null;
+                                }
+                            }
+                            else if (type == "REMOVE")
+                            {
+                                if (tokens.Length > 4)
+                                {
+                                    var name = tokens[4];
+                                    if (modInfo.ContainsKey(name))
+                                    {
+                                        buildMods[steps.Count] = modInfo[name];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (line.StartsWith("1 "))
+                {
+                    var tokens = Regex.Split(line.Trim(), " +");
+                    if (tokens.Length >= 15)
+                    {
+                        var part = new LDrawPart();
+                        part.partId = tokens[14].ToLower();
+                        hasModelInStep |= modelNames.Contains(part.partId);
+                        Vector3 posLDraw = new Vector3(
+                                float.Parse(tokens[2]),
+                                float.Parse(tokens[3]),
+                                float.Parse(tokens[4])
+                            ) * 0.01f;
+                        part.position = new Vector3(posLDraw.x, posLDraw.y, -posLDraw.z);
+                        Matrix4x4 mLDraw = new Matrix4x4();
+                        mLDraw.SetColumn(0, new Vector4(float.Parse(tokens[5]), float.Parse(tokens[8]), float.Parse(tokens[11]), 0));
+                        mLDraw.SetColumn(1, new Vector4(float.Parse(tokens[6]), float.Parse(tokens[9]), float.Parse(tokens[12]), 0));
+                        mLDraw.SetColumn(2, new Vector4(float.Parse(tokens[7]), float.Parse(tokens[10]), float.Parse(tokens[13]), 0));
+                        mLDraw.SetColumn(3, new Vector4(0, 0, 0, 1));
+                        Matrix4x4 RL = Consts.NegateZ * mLDraw * Consts.NegateZ;
+                        part.rotation = RL.rotation;
+                        // int colorCode = int.Parse(tokens[1]);
+                        // part.color = LDrawColorManager.GetColor(colorCode);
+                        part.color = int.Parse(tokens[1]);
+                        currentStep.parts.Add(part);
+                    }
+                }
+            }
+
+            if (currentStep.parts.Count > 0)
+            {
+                // Always has rotation for the last step
+                currentStep.rotRef = currentRotationRef;
+                steps.Add(currentStep);
+            }
+            else
+            {
+                var lastStep = steps.Count - 1;
+                // Ensure the last step has rotation
+                if (lastStep >= 0 && steps[lastStep].rotation == null)
+                {
+                    steps[lastStep].rotRef = currentRotationRef;
+                }
+            }
+
+            return (steps, buildMods, alias, description);
+        }
+
+        public void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps,
+            Dictionary<int, LDrawColor> colors,
+            Dictionary<string, LDrawPartDesc> partDescriptions,
+            string outputPath = "Assets/Resources/LDrawStepData.json")
+        {
+            var data = new StepPackage { colors = colors, partDescriptions = partDescriptions, models = models, flatSteps = flatSteps };
+
+            var settings = new JsonSerializerSettings()
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            settings.Converters.Add(new Vector3Converter());
+            settings.Converters.Add(new QuaternionConverter());
+            settings.Converters.Add(new ColorConverter());
+            settings.Converters.Add(new NullableVector3Converter());
+
+
+            string json = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
+            File.WriteAllText(outputPath, json);
+            Debug.Log($"Saved model step data to {outputPath}");
+            AssetDatabase.Refresh();
+        }
+
         private string FindPartFile(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths)
         {
             string path = FindPartFileInPath(partId, partLibraryPath);
-            int i=0;
-            while (path == null && i<unofficialPartLibraryPaths.Length)
+            int i = 0;
+            while (path == null && i < unofficialPartLibraryPaths.Length)
             {
                 path = FindPartFileInPath(partId, unofficialPartLibraryPaths[i]);
                 i++;
@@ -170,28 +432,28 @@ namespace LDraw.Editor
             // - parts/ (main parts folder)
             // - p/ (subparts folder, at same level as parts/)
             // - parts/s/ (studs folder inside parts/)
-            
+
             // First check in the main parts folder
             string partsPath = Path.Combine(partLibraryPath, "parts", partId);
             if (File.Exists(partsPath))
             {
                 return partsPath;
             }
-            
+
             // Check in the p/ folder (subparts, at same level as parts/)
             string pPath = Path.Combine(partLibraryPath, "p", partId);
             if (File.Exists(pPath))
             {
                 return pPath;
             }
-            
+
             // Check in parts/s/ folder (studs inside parts/)
             string sPath = Path.Combine(partLibraryPath, "parts", "s", partId);
             if (File.Exists(sPath))
             {
                 return sPath;
             }
-            
+
             // Check other common subfolders inside parts/
             string[] subfolders = { "48", "8", "studs" };
             foreach (string subfolder in subfolders)
@@ -202,7 +464,7 @@ namespace LDraw.Editor
                     return fullPath;
                 }
             }
-            
+
             return null;
         }
 
@@ -254,10 +516,10 @@ namespace LDraw.Editor
             // Build the combined mesh
             Mesh combined = new Mesh();
             combined.name = "CombinedMesh";
-            
+
             // Set index format to UInt32 to support more than 65,535 vertices
             combined.indexFormat = IndexFormat.UInt32;
-            
+
             combined.SetVertices(allVertices);
 
             if (allNormals.Count == allVertices.Count)
@@ -273,7 +535,7 @@ namespace LDraw.Editor
             return combined;
         }
 
-        private (LDrawMesh, string) ParsePartFileLines(string partId, string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths, bool needDescription)
+        private (LDrawMesh, string, string) ParsePartFileLines(string partId, string[] lines, string partLibraryPath, string[] unofficialPartLibraryPaths)
         {
             var colorInstances = new Dictionary<Material, (List<Vector3>, List<int>)>();
             var hasContent = false;
@@ -281,22 +543,28 @@ namespace LDraw.Editor
             bool invertNext = false;
             bool isCW = false;
 
+            string alias = null;
             string description = null;
-            string comment = null;
 
             foreach (var line in lines)
             {
                 string trimmed = line.Trim();
                 if (string.IsNullOrEmpty(trimmed)) continue;
 
-                if (needDescription && description == null && trimmed.StartsWith("0 "))
+                if (description == null && trimmed.StartsWith("0 "))
                 {
                     description = trimmed.Substring(2);
                 }
 
-                if (!needDescription && trimmed.StartsWith("0 COMMENT") && comment == null)
+                if (trimmed.StartsWith("0 COMMENT"))
                 {
-                    comment = trimmed.Substring(10);
+                    var comment = trimmed.Substring(10);
+                    var parts = comment.Split(':');
+                    if (parts.Length == 2)
+                    {
+                        alias = parts[0];
+                        description = parts[1];
+                    }
                 }
 
                 if (trimmed.StartsWith("0 BFC CERTIFY CW", StringComparison.OrdinalIgnoreCase))
@@ -319,7 +587,7 @@ namespace LDraw.Editor
                 if (tokens.Length < 2) continue;
 
                 string type = tokens[0];
-             
+
                 try
                 {
                     switch (type)
@@ -335,7 +603,7 @@ namespace LDraw.Editor
 
                             List<Vector3> allVertices = null;
                             List<int> allTriangles = null;
-                            
+
                             if (colorInstances.ContainsKey(mat))
                             {
                                 (allVertices, allTriangles) = colorInstances[mat];
@@ -366,7 +634,7 @@ namespace LDraw.Editor
                                     bool isMirrored = MatrixIsMirrored(transform);
                                     transform = Consts.NegateZ * transform * Consts.NegateZ;
 
-                                    (LDrawMesh ldrawMesh, _) = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
+                                    (LDrawMesh ldrawMesh, _, _) = LoadPartMesh(referencedPartId, partLibraryPath, unofficialPartLibraryPaths, null);
                                     if (ldrawMesh != null)
                                     {
                                         hasContent = true;
@@ -396,7 +664,7 @@ namespace LDraw.Editor
 
                                             List<Vector3> vertices = null;
                                             List<int> triangles = null;
-                                            
+
                                             if (colorInstances.ContainsKey(material))
                                             {
                                                 (vertices, triangles) = colorInstances[material];
@@ -406,7 +674,7 @@ namespace LDraw.Editor
                                                 vertices = new List<Vector3>();
                                                 triangles = new List<int>();
                                                 colorInstances[material] = (vertices, triangles);
-                                            } 
+                                            }
 
                                             Mesh submesh = ExtractSubMesh(meshCopy, subIdx);
 
@@ -449,7 +717,7 @@ namespace LDraw.Editor
                                 break;
                             }
                             else if (type == "3")
-                            { 
+                            {
                                 if (tokens.Length >= 11)
                                 {
                                     hasContent = true;
@@ -537,13 +805,13 @@ namespace LDraw.Editor
             }
 
             if (!hasContent)
-            {                
-                return (null, null);
+            {
+                return (null, null, null);
             }
 
             var go = CreateMultiMeshObject(partId, colorInstances);
             go.SetActive(false);
-            return (new LDrawMesh{go=go, isCW=isCW}, needDescription ? description : comment);
+            return (new LDrawMesh { go = go, isCW = isCW }, alias, description);
         }
 
         private GameObject CreateMultiMeshObject(string partId, Dictionary<Material, (List<Vector3>, List<int>)> coloredContent)
@@ -553,7 +821,7 @@ namespace LDraw.Editor
             var materialList = new List<Material>();
 
             foreach (var kvp in coloredContent)
-            {                    
+            {
                 var material = kvp.Key;
 
                 var mesh = new Mesh();
@@ -576,7 +844,7 @@ namespace LDraw.Editor
             }
 
             Mesh finalMesh = new Mesh();
-            
+
             // Set index format to UInt32 to support more than 65,535 vertices
             finalMesh.indexFormat = IndexFormat.UInt32;
             finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
@@ -593,64 +861,63 @@ namespace LDraw.Editor
             // Mesh meshAsset = SaveMeshAsset(finalMesh, partId);
             go.AddComponent<MeshFilter>().sharedMesh = finalMesh;
             go.AddComponent<MeshRenderer>().sharedMaterials = materialList.ToArray();
-            
+
             return go;
         }
 
-        private (LDrawMesh, string) LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
+        private (LDrawMesh, string, string) LoadPartMesh(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines)
         {
             if (partCache.ContainsKey(partId))
             {
                 return partCache[partId];
             }
 
-            bool needDescription = false;
             if (lines == null)
             {
                 string datPath = FindPartFile(partId, partLibraryPath, unofficialPartLibraryPaths);
                 if (datPath == null)
                 {
                     Debug.LogError($"Part file not found: {partId}");
-                    return (null, null);
+                    return (null, null, null);
                 }
 
                 lines = File.ReadAllLines(datPath);
-                needDescription = true;
             }
 
             try
             {
-                (LDrawMesh ldrawMesh, string description) = ParsePartFileLines(partId, lines, partLibraryPath, unofficialPartLibraryPaths, needDescription);
+                (LDrawMesh ldrawMesh, string alias, string description) = ParsePartFileLines(partId, lines, partLibraryPath, unofficialPartLibraryPaths);
+
                 if (ldrawMesh == null)
                 {
                     Debug.LogWarning($"No geometry parsed from: {partId}");
-                    return (null, null);
+                    return (null, null, null);
                 }
 
                 var mat = ldrawMesh.go.GetComponent<Renderer>().sharedMaterials[0];
 
-                partCache[partId] = (ldrawMesh, description);
+                partCache[partId] = (ldrawMesh, alias, description);
 
-                return (ldrawMesh, description);
+                return (ldrawMesh, alias, description);
             }
             catch (Exception e)
             {
                 Debug.LogError($"Failed to parse mesh for {partId}: {e.Message}");
-                return (null, null);
+                return (null, null, null);
             }
         }
 
         public LDrawMesh LoadPartFromLibrary(string partId, string partLibraryPath, string[] unofficialPartLibraryPaths, string[] lines = null)
         {
-            (LDrawMesh ldrawMesh, string description) = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPaths, lines);
+            (LDrawMesh ldrawMesh, string alias, string description) = LoadPartMesh(partId, partLibraryPath, unofficialPartLibraryPaths, lines);
             if (description != null)
             {
-                partDescriptions[partId] = description;
+                partDescriptions[partId] = new LDrawPartDesc { id = alias, description = description };
             }
             if (ldrawMesh != null)
             {
                 var go = ldrawMesh.go;
-                go.SetActive(true);               
+                go.SetActive(true);
                 MeshFilter mf = go.GetComponent<MeshFilter>();
                 Mesh meshAsset = SaveMeshAsset(mf.sharedMesh, partId);
                 mf.sharedMesh = meshAsset;
@@ -752,7 +1019,7 @@ namespace LDraw.Editor
                     }
                     else if (submodelCache.ContainsKey(part.partId))
                     {
-                        setColor = LDrawParser.partModels.ContainsKey(part.partId);
+                        setColor = isPartModel(part.partId);
                         gameObject = submodelCache[part.partId];
                         var meshFilter = gameObject.GetComponent<MeshFilter>();
                         if (meshFilter == null)
@@ -839,11 +1106,11 @@ namespace LDraw.Editor
             var materialList = new List<Material>();
 
             foreach (var kvp in colorToInstances)
-            {                    
+            {
                 var material = kvp.Key;
                 // Can use groupMesh.CombineMeshes, because it only take the first mesh for some reason
                 // var groupMesh = CombineMeshesPreserveSubmeshes(kvp.Value);
-                Mesh groupMesh = new Mesh();           
+                Mesh groupMesh = new Mesh();
                 groupMesh.indexFormat = IndexFormat.UInt32;
                 groupMesh.CombineMeshes(kvp.Value.ToArray(), true, false); // keep submeshes separate
 
@@ -857,7 +1124,7 @@ namespace LDraw.Editor
             }
 
             Mesh finalMesh = new Mesh();
-            
+
             // Set index format to UInt32 to support more than 65,535 vertices
             finalMesh.indexFormat = IndexFormat.UInt32;
             finalMesh.CombineMeshes(subMeshList.ToArray(), false, false); // keep submeshes separate
