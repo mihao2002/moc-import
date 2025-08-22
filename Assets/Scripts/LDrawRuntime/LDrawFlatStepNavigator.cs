@@ -12,7 +12,6 @@ namespace LDraw.Runtime
         // private int currentStep = 0;
         private int currentModel = -1;
         private int highlightedStep = -1;
-        private int shownModel = -1;
         private bool canNavigate = true;
         private bool preview;
        
@@ -26,7 +25,6 @@ namespace LDraw.Runtime
             this.flatSteps = flatSteps;
             ldrawCamera = mainCamera;
             this.preview = preview;
-            // ShowFlatStep();
         }
 
         public bool CanNavigate
@@ -36,31 +34,13 @@ namespace LDraw.Runtime
                 return canNavigate;
             }
         }
-
-        public int TotalStep
+        
+        public int CurrentModel
         {
             get
             {
-                return flatSteps.Count;
+                return currentModel;
             }
-        }
-
-        public void HighlightCurrent(int step)
-        {
-            if (preview) return;
-
-            if (highlightedStep >= 0)
-            {
-                var flatStep = flatSteps[highlightedStep];
-                var container = models[flatStep.model].container;
-                container.HighlightStep(flatStep.modelStepIdx, false);
-                highlightedStep = -1;
-            }
-
-            var currentFlatStep = flatSteps[step];
-            var currentContainer = models[currentFlatStep.model].container;
-            currentContainer.HighlightStep(currentFlatStep.modelStepIdx, true);
-            highlightedStep = step;        
         }
 
         public void GotoStep(int step, bool animate = false)
@@ -72,118 +52,71 @@ namespace LDraw.Runtime
             }
         }
 
-        public Dictionary<LDrawPartCore, int> GetStepParts(int step)
+        public void HideCurrentModel()
         {
-            var flatStep = flatSteps[step];
-            var model = models[flatStep.model];
-            var modelSteps = model.steps;
-            var stepIdx = flatStep.modelStepIdx;
-            var parts = modelSteps[stepIdx].parts;
-
-            var results = new Dictionary<LDrawPartCore, int>();
-            foreach (var part in parts)
+            if (currentModel >= 0)
             {
-                if (results.ContainsKey(part))
-                {
-                    results[part] += 1;
-                }
-                else
-                {
-                    results[part] = 1;
-                }
-            }
-
-            var buildMods = model.buildMods;
-            if (buildMods.ContainsKey(flatStep.modelStepIdx))
-            {
-                var buildMod = buildMods[flatStep.modelStepIdx];
-                var refStepParts= modelSteps[buildMod.step].parts;
-                for (var i=buildMod.start; i<= buildMod.end; i++)
-                {
-                    var part = refStepParts[i];
-                    if (results.ContainsKey(part))
-                    {
-                        results[part]--;
-                        if (results[part] == 0)
-                        {
-                            results.Remove(part);
-                        }
-                    }
-                }
-            }
-
-            return results;
-        }
-
-        public GameObject GetPartFromStep(int step, int index)
-        {
-            var flatStep = flatSteps[step];
-            var model = models[flatStep.model];
-            var modelContainer = model.container;
-            var stepContainer = modelContainer.GetStepContainer(flatStep.modelStepIdx);
-            GameObject childGo = stepContainer.transform.GetChild(index)?.gameObject;
-            if (childGo == null)
-            {
-                Debug.LogError($"Failed to get object {index}");
-                return null;
-            }
-
-            return childGo;
-        }
-
-        public void HideShownModel()
-        {
-            if (shownModel >= 0)
-            {
-                models[shownModel].container.Show(false);
-                shownModel = -1;
+                models[currentModel].container.Show(false);
+                currentModel = -1;
             }             
         }
 
-        public void HideIfModelChange(int step)
+        private void HighlightStep(int step, bool highlight)
         {
             var flatStep = flatSteps[step];
-            if (currentModel != flatStep.model)
-            {
-                HideShownModel();               
-            }
+            var container = models[flatStep.model].container;
+            container.HighlightStep(flatStep.modelStepIdx, highlight);
         }
 
-        private void ShowHideStepParts(Dictionary<int, LDrawBuildMod> buildMods, ModelContainer modelContainer, int step)
+        private void ShowStepModification(Dictionary<int, LDrawBuildMod> buildMods, ModelContainer modelContainer, int step)
         {
+            // Show all parts in this step, this is to ensure no MOD part is hidden by a later replacement.
             if (buildMods.Count > 0)
             {
-                modelContainer.ShowAllStepParts(step);
+                modelContainer.ShowStepParts(step, true, 0, -1);
             }
-
+        
             if (buildMods.ContainsKey(step))
             {
+                // Hide the corresponding parts in earlier step.
                 var buildMod = buildMods[step];
-                modelContainer.HideStepParts(buildMod.step, buildMod.start, buildMod.end);
-            }            
+                modelContainer.ShowStepParts(buildMod.step, false, buildMod.start, buildMod.end);
+            }
         } 
+        
+        private void UpdateHighlight(int step)
+        {
+            if (preview) return;
 
-        private void ShowFlatStep(int step1, bool animateStep = true)
+            if (highlightedStep >= 0)
+            {
+                HighlightStep(highlightedStep, false);
+                highlightedStep = -1;
+            }
+
+            HighlightStep(step, true);
+            highlightedStep = step;
+        }
+
+        private void ShowFlatStep(int flatStepIdx, bool animateStep = true)
         {
             // Hide all models
-            HideShownModel();
+            HideCurrentModel();
 
-            var flatStep = flatSteps[step1];
+            // Highlight the current step
+            UpdateHighlight(flatStepIdx);
+
+            var flatStep = flatSteps[flatStepIdx];
             var model = models[flatStep.model];
             var buildMods = model.buildMods;
-
             var modelContainer = model.container;
-
             var modelSteps = model.steps;
             var stepIdx = flatStep.modelStepIdx;
 
-            // Highlight the current step
-            HighlightCurrent(step1);
-
             // Show steps up to stepIdx-1
-            for (int i = 0; i <= stepIdx-1; i++)
+            for (int i = 0; i <= stepIdx - 1; i++)
             {
-                ShowHideStepParts(buildMods, modelContainer, i);
+                ShowStepModification(buildMods, modelContainer, i);
                 modelContainer.ShowStep(i, true);
             }
 
@@ -193,10 +126,10 @@ namespace LDraw.Runtime
                 modelContainer.ShowStep(i, false);
             }
 
-            var lastStepOfModel = stepIdx == modelSteps.Count-1;
+            var lastStepOfModel = stepIdx == modelSteps.Count - 1;
 
             modelContainer.Show(true);
-            shownModel = flatStep.model;
+            currentModel = flatStep.model;
 
             // Set camera distance for this step
             var step = modelSteps[stepIdx];
@@ -213,17 +146,15 @@ namespace LDraw.Runtime
                 center = step.modelBounds.center;
                 radius = step.modelBounds.extents.magnitude;
             }
-            
+
             canNavigate = false;
-            ldrawCamera.SetCamera(center, radius, rotation, animateStep, 
+            ldrawCamera.SetCamera(center, radius, rotation, animateStep,
                 () =>
                 {
-                    ShowHideStepParts(buildMods, modelContainer, stepIdx);
+                    ShowStepModification(buildMods, modelContainer, stepIdx);
                     modelContainer.ShowStep(stepIdx, true);
                     canNavigate = true;
-                }, shownModel, lastStepOfModel);
-
-            currentModel = shownModel; 
+                }, currentModel, lastStepOfModel);
         }
    }
 }

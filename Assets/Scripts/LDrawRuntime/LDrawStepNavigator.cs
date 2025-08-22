@@ -30,6 +30,7 @@ namespace LDraw.Runtime
         private Sprite[] stepSprites;
 
         private LDrawFlatStepNavigator navigator;
+        private LDrawStepManager stepManager;
         private InputHandler inputHandler;
         private Dictionary<int, LDrawColor> colors;
         private Dictionary<string, LDrawPartDesc> partDescriptions;
@@ -64,13 +65,14 @@ namespace LDraw.Runtime
 
             cam = new LDrawCamera(mainCamera, true);
             navigator = new LDrawFlatStepNavigator(models, cam, flatSteps);
+            stepManager = new LDrawStepManager(models, flatSteps);
             inputHandler = new InputHandler(cam);
 
-            partSpriteDict = LoadAllSpritesFromResources();
-            stepSprites = LoadAllStepSpritesFromResources();
+            partSpriteDict = LoadPartSprites();
+            stepSprites = LoadStepSprites();
 
             PopulateSteps();
-            UpdateNavigationText();
+            UpdateStepText();
             ShowCurrentStep();
         }
 
@@ -83,21 +85,28 @@ namespace LDraw.Runtime
 
             if (showParts)
             {              
-                leftPaneToggle.Expand(0, false);                
+                leftPaneToggle.SelectItem(0, false);                
             }
             else
             {
-                navigator.HideIfModelChange(currentStep);
+                // if the current step is for a new model, then hide the current model,
+                // otherwise animate the model.
+                var model = stepManager.GetModel(currentStep);
+                if (navigator.CurrentModel != model)
+                {
+                    navigator.HideCurrentModel();               
+                }
+
                 leftPaneToggle.Shrink(() => {
                     navigator.GotoStep(currentStep, true);                
                 });
             }
 
             bottomPaneToggle.SetSelectedItem(currentStep);
-            UpdateNavigationText();
+            UpdateStepText();
         }
 
-        public static Sprite[] LoadAllStepSpritesFromResources()
+        private static Sprite[] LoadStepSprites()
         {          
             Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawStepImages");
             var result = new Sprite[sprites.Length];
@@ -120,7 +129,7 @@ namespace LDraw.Runtime
         /// Loads all sprites from Resources/LDrawImages folder into nested dictionary [subfolder][filename] = Sprite
         /// Assumes sprites are imported in Resources/LDrawImages and subfolders.
         /// </summary>
-        public static Dictionary<string, Sprite> LoadAllSpritesFromResources()
+        private static Dictionary<string, Sprite> LoadPartSprites()
         {
             var result = new Dictionary<string, Sprite>();
 
@@ -136,9 +145,8 @@ namespace LDraw.Runtime
         private void PopulateStepParts()
         {
             //Dictionary<LDrawPartCore, int>
-            var parts = navigator.GetStepParts(currentStep);
-            var partCounts = new Dictionary<Sprite, int>();
-            var partInfo = new Dictionary<Sprite, Tuple<string, string, string, int>>();
+            var parts = stepManager.GetStepParts(currentStep);
+            var partInfo = new Dictionary<Sprite, (string, LeftPanelToggle.ItemContext)>();
             foreach (var kvp in parts)
             {
                 var part = kvp.Key;                
@@ -156,9 +164,8 @@ namespace LDraw.Runtime
 
                 if (partSpriteDict.ContainsKey(spriteKey))
                 {
-                    var idx = partCounts.Count;
+                    var idx = partInfo.Count;
                     var sprite = partSpriteDict[spriteKey];
-                    partCounts[sprite]=kvp.Value;
                     string description = null;
                     if (partDescriptions.ContainsKey(part.partId))
                     {
@@ -166,8 +173,11 @@ namespace LDraw.Runtime
                         id = desc.id ?? id;
                         description = desc.description;
                     }
-                    
-                    partInfo[sprite] = new Tuple<string, string, string, int>(id, description, colorName, idx);
+
+                    var go = stepManager.GetPartFromStep(currentStep, idx);
+                    var context = new LeftPanelToggle.ItemContext(go, id, description, colorName);
+
+                    partInfo[sprite] = (kvp.Value.ToString(), context);
                 }
                 else
                 {
@@ -176,13 +186,12 @@ namespace LDraw.Runtime
             }
 
             leftPaneToggle.ClearGrid();
-            foreach (var kvp in partCounts)
+            foreach (var kvp in partInfo)
             {
-                var info = partInfo[kvp.Key];
-                AddItem(kvp.Key, kvp.Value.ToString(), info.Item1, info.Item2, info.Item3, info.Item4);
+                leftPaneToggle.AddItem(kvp.Key, kvp.Value.Item1, kvp.Value.Item2);
             }
 
-            leftPaneToggle.SetItemCount(partCounts.Count);
+            leftPaneToggle.SetItemCount(partInfo.Count);
             partListStep = currentStep;
         }
 
@@ -224,10 +233,10 @@ namespace LDraw.Runtime
                 }
                 else
                 {
-                    if (currentStep < navigator.TotalStep - 1)
+                    if (currentStep < stepManager.TotalStep - 1)
                     {
                         currentStep++;
-                        showParts = navigator.GetStepParts(currentStep).Count > 0;
+                        showParts = stepManager.GetStepParts(currentStep).Count > 0;
                     }
                 }
 
@@ -240,7 +249,7 @@ namespace LDraw.Runtime
         {
             if (CanNavigate)
             {
-                if (!showParts && navigator.GetStepParts(currentStep).Count > 0)
+                if (!showParts && stepManager.GetStepParts(currentStep).Count > 0)
                 {
                     showParts = true;
                 }
@@ -257,17 +266,9 @@ namespace LDraw.Runtime
             }
         }
 
-        private void UpdateNavigationText()
+        private void UpdateStepText()
         {
-            if (navigator == null)
-            {
-                return;
-            }
-
-            if (stepNumberText != null)
-            {
-                stepNumberText.text = $"{currentStep+1}";
-            }
+            stepNumberText.text = $"{currentStep+1}";
         }
 
         // Runtime-specific method to instantiate all parts from prefabs
@@ -328,19 +329,10 @@ namespace LDraw.Runtime
                 bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, ()=>
                 {
                     currentStep = stepIdx;
-                    showParts = navigator.GetStepParts(stepIdx).Count > 0;;
+                    showParts = stepManager.GetStepParts(stepIdx).Count > 0;;
                     ShowCurrentStep(); 
                 });
             }
-        }
-
-        /// <summary>
-        /// Adds a new item to the grid.
-        /// </summary>
-        public void AddItem(Sprite icon, string label, string partId, string description, string colorName, int index)
-        {
-            var go = navigator.GetPartFromStep(currentStep, index);
-            leftPaneToggle.AddItem(icon, label, partId, description, colorName, go);
         }
     }
 }

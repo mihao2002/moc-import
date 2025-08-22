@@ -3228,7 +3228,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sidePanel: {fileID: 2015060207}
-  cam: {fileID: 367986510}
+  mainCamera: {fileID: 367986510}
   grid: {fileID: 674575177}
   partDetail: {fileID: 1477842137}
   expander: {fileID: 1354874919}

@@ -5,56 +5,36 @@ namespace LDraw.Runtime
 {
     public class ModelContainer
     {
-        private string modelName;
+        private const string ModelNamePrefix = "model_";
+        private const string StepNamePrefix = "step_";
+
         private List<GameObject> stepContainers = new List<GameObject>();
         private GameObject modelContainer;
 
         public ModelContainer(string modelName)
         {
-            this.modelName = modelName;
-            modelContainer = new GameObject($"ModelContainer_{modelName}");
+            modelContainer = new GameObject($"{ModelNamePrefix}{modelName}");
             modelContainer.SetActive(false); // Hide by default
         }
 
-        public void ShowAllStepParts(int step)
+        public void ShowStepParts(int step, bool show, int start, int end)
         {
             var stepContainer = stepContainers[step];
             int childCount = stepContainer.transform.childCount;
-            for (int i = 0; i < childCount; i++)
+            end = end >= 0 ? end : childCount - 1;
+            for (int i = start; i <= end; i++)
             {
                 var child = stepContainer.transform.GetChild(i);
-                child.gameObject.SetActive(true);
-            }
-        }
-
-        public void HideStepParts(int step, int start, int end)
-        {
-            var stepContainer = stepContainers[step];
-
-            int childCount = stepContainer.transform.childCount;
-            // Clamp start and end to valid range to avoid errors
-            int clampedStart = Mathf.Max(0, start);
-            int clampedEnd = Mathf.Min(end, childCount - 1);
-
-            for (int i = clampedStart; i <= clampedEnd; i++)
-            {
-                var child = stepContainer.transform.GetChild(i);
-                child.gameObject.SetActive(false);
+                child.gameObject.SetActive(show);
             }
         }
 
         public GameObject AddStep(List<GameObject> stepObjects)
         {
-            GameObject stepContainer = new GameObject($"Step_{stepContainers.Count}");
+            GameObject stepContainer = new GameObject($"{StepNamePrefix}{stepContainers.Count}");
             stepContainer.transform.SetParent(modelContainer.transform, worldPositionStays: false);
             stepContainer.SetActive(false); // Hide by default
-
-            foreach (var go in stepObjects)
-            {
-                if (go != null)
-                    go.transform.SetParent(stepContainer.transform, false);
-            }
-
+            stepObjects.ForEach(so => so.transform.SetParent(stepContainer.transform, false));
             stepContainers.Add(stepContainer);
             return stepContainer;
         }
@@ -64,6 +44,22 @@ namespace LDraw.Runtime
             modelContainer.SetActive(show);
         }
 
+        public void HighlightStep(int step, bool highlight)
+        {
+            int layer = LayerMask.NameToLayer(highlight ? Consts.HighlightLayerName : Consts.NormalLayerName);
+            SetLayerRecursively(stepContainers[step], layer);
+        }
+
+        public void ShowStep(int step, bool show)
+        {
+            stepContainers[step].SetActive(show);
+        }
+
+        public GameObject GetStepContainer(int step)
+        {
+            return stepContainers[step];
+        }
+
         private void SetLayerRecursively(GameObject obj, int layer)
         {
             obj.layer = layer;
@@ -71,52 +67,6 @@ namespace LDraw.Runtime
             {
                 SetLayerRecursively(child.gameObject, layer);
             }
-        }
-
-        public void HighlightStep(int stepIndex, bool highlight)
-        {
-            if (stepIndex >= 0 && stepIndex < stepContainers.Count)
-            {
-                int layer = LayerMask.NameToLayer(highlight ? "Outline" : "Default");
-                SetLayerRecursively(stepContainers[stepIndex], layer);
-            }
-        }
-
-        public void ShowStep(int stepIndex, bool show)
-        {
-            if (stepIndex >= 0 && stepIndex < stepContainers.Count)
-                stepContainers[stepIndex].SetActive(show);
-        }
-
-        public void Rotate(float x, float y, float z)
-        {
-            // Debug.Log($"Rotate {x} {y} {z}");
-            // Quaternion rotation = Quaternion.Euler(-x, -y, z);
-            // modelContainer.transform.localRotation = rotation;
-
-            float zx = x;            // keep x
-            float zy = y;            // keep y
-            float zz = -z;           // negate z rotation!
-
-            Quaternion qx = Quaternion.AngleAxis(zx, Vector3.right);
-            Quaternion qy = Quaternion.AngleAxis(zy, Vector3.up);
-            Quaternion qz = Quaternion.AngleAxis(zz, Vector3.forward);
-
-            // Match LDCad's X → Y → Z order
-            Quaternion rotation = qz * qy * qx;
-            modelContainer.transform.localRotation = rotation;
-        }
-
-        public int GetStepCount()
-        {
-            return stepContainers.Count;
-        }
-
-        public GameObject GetStepContainer(int stepIndex)
-        {
-            if (stepIndex >= 0 && stepIndex < stepContainers.Count)
-                return stepContainers[stepIndex];
-            return null;
         }
     }
 } 

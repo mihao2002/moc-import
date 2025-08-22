@@ -76,7 +76,7 @@ public class BottomPanelToggle : MonoBehaviour
 
         items.Add(itemUI);
 
-        itemUI.SetContent(sprite, $"{step+1}", null, action);
+        itemUI.SetContent(sprite, $"{step+1}", action);
     }
 
     void Hide()
@@ -85,7 +85,6 @@ public class BottomPanelToggle : MonoBehaviour
       
         // Rotate the arrow 180 degrees around Z to flip it
         arrowImage.localEulerAngles = new Vector3(0, 0, 0);
-        // arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, buttonHalfHeight);
     }
 
     // Call this method from the Button onClick event
@@ -117,6 +116,5 @@ public class BottomPanelToggle : MonoBehaviour
 
         // Rotate the arrow 180 degrees around Z to flip it
         arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
-        // arrowImage.anchoredPosition = new Vector2(arrowImage.anchoredPosition.x, isExpanded ? -buttonHalfHeight : buttonHalfHeight);
     }
 }

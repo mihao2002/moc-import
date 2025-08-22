@@ -10,6 +10,9 @@ public class PartGridItem : MonoBehaviour, IPointerClickHandler
     public TMP_Text labelText;
     public GameObject border;
     public Action onClick;
+
+    public object context;
+    
     public GameObject go;
 
     public string partId;
@@ -17,16 +20,20 @@ public class PartGridItem : MonoBehaviour, IPointerClickHandler
     public string colorName;
 
     // Call this method when setting up the item
-    public void SetContent(Sprite icon, string label, GameObject go, Action onClick = null, string partId=null, string description = null, string colorName = null)
+    public void SetContent(Sprite icon, string label, Action onClick = null, object context = null)
     {
         iconImage.sprite = icon;
         labelText.text = label;
         this.onClick = onClick;
-        this.go = go;
+        this.context = context;
+    }
 
-        this.partId = partId;
-        this.description = description;
-        this.colorName = colorName;
+    public object Context
+    {
+        get
+        {
+            return context;
+        }
     }
 
     public void OnPointerClick(PointerEventData eventData)

@@ -15,7 +15,7 @@ namespace LDraw.Runtime
         private static readonly Quaternion IsometricRotation = Quaternion.AngleAxis(30f, Vector3.right) * 
             Quaternion.AngleAxis(45f, Vector3.up) * 
             Quaternion.LookRotation(Vector3.back, Vector3.down);
-    // Quaternion.Euler(35.264f, -45f, 0f);  // flipped
+
         private static readonly Quaternion headOnRotation = Quaternion.LookRotation(Vector3.back, Vector3.down); // flipped
         private Vector3 cameraCenter;
         private float cameraRadius;
@@ -41,8 +41,6 @@ namespace LDraw.Runtime
             this.animateEnabled = animate;
             currentTag = -1;
             up = cam.transform.up;
-
-            // animator = cam.GetComponent<CameraAnimator>();
 
             tagStates = new Dictionary<int, (Vector3, Vector3, Vector3)>();
 
@@ -95,7 +93,6 @@ namespace LDraw.Runtime
 
         public void SetCamera(Vector3 center, float radius, Vector3? rotation, bool animate = false, Action onAnimationComplete = null, int tag = -1, bool cleanState = false)
         {
-            // var oldCenter = cameraCenter;
             cameraCenter = center;
             cameraRadius = radius;
 
@@ -134,7 +131,6 @@ namespace LDraw.Runtime
 
                 // Set camera position and orientation
                 targetPos = center + orbitOffset;
-                //cam.transform.LookAt(center, up);
             }
             else
             {
