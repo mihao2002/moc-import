@@ -266,13 +266,6 @@ namespace LDraw.Runtime
         // Runtime-specific method to instantiate all parts from prefabs
         private void PreInstantiateAllParts(List<RuntimeModelData> models, Dictionary<int, LDrawColor> colors)
         {
-            var modelNames = new Dictionary<string, int>();
-            for (var i=0; i<models.Count; i++)
-            {
-                var model = models[i];
-                modelNames.Add(model.modelName, i);
-            }
-
             foreach (var modelData in models)
             {
                 var modelContainer = new ModelContainer(modelData.modelName);
@@ -291,7 +284,7 @@ namespace LDraw.Runtime
                         GameObject go = Instantiate(prefab, parentContainer);
                         go.transform.localPosition = part.position;
                         go.transform.localRotation = part.rotation;
-                        if (!modelNames.ContainsKey(part.partId))
+                        if (!modelNames.Contains(part.partId))
                         {
                             // Regular part: ensure it has a renderer, assign material asset if found
                             var renderer = go.GetComponent<Renderer>();

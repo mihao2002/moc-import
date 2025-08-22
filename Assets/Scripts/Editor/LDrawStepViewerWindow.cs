@@ -345,6 +345,22 @@ namespace LDraw.Editor
             cam.aspect = 1;
             var ldrawCamera = CreatePreviewCamera(cam, rt);
 
+            // remove part models from models, so we don't need to generate steps for part models
+            var nonPartModels = new List<RuntimeModelData>();
+            foreach (var model in models)
+            {
+                if (!LDrawParser.partModels.ContainsKey(model.modelName))
+                    nonPartModels.Add(model);
+            }
+
+            models = nonPartModels;
+            modelNames = new Dictionary<string, int>();
+            for (var i=0; i<models.Count; i++)
+            {
+                var model = models[i];
+                modelNames[model.modelName] = i;
+            }
+
             // construct model steps
             OnProgressUpdate(0f, "Loading model steps...");
             yield return null;

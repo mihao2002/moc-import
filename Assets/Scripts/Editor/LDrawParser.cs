@@ -12,6 +12,7 @@ namespace LDraw.Editor
     public static class LDrawParser
     {
         public static string mainModelName = "main.ldr";
+        public static Dictionary<string, (string, string)> partModels = new Dictionary<string, (string, string)>();
 
         // New: Parse all models and their steps, without recursive expansion
         public static (List<RuntimeModelData>, Dictionary<string, string[]>) ParseModels(string filePath)
@@ -49,7 +50,12 @@ namespace LDraw.Editor
             foreach (var (name, start, end) in fileSections)
             {
                 if (mainModelName == null) mainModelName = name;
-                (List<LDrawStep> steps, Dictionary<int, LDrawBuildMod> buildMods) = ParseStepsFromLines(lines, start, end, modelNames);
+                (List<LDrawStep> steps, Dictionary<int, LDrawBuildMod> buildMods, string alias, string description) = ParseStepsFromLines(lines, start, end, modelNames);
+                if (alias != null)
+                {
+                    partModels[name] = (alias, description);
+                }
+                
                 if (steps.Count > 0)
                 {
                     var modelData = new RuntimeModelData{
@@ -73,7 +79,7 @@ namespace LDraw.Editor
         }
 
         // Helper: Parse a range of lines into steps
-        private static (List<LDrawStep>, Dictionary<int, LDrawBuildMod>) ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
+        private static (List<LDrawStep>, Dictionary<int, LDrawBuildMod>, string, string) ParseStepsFromLines(string[] lines, int start, int end, HashSet<string> modelNames)
         {
             var steps = new List<LDrawStep>();
             var currentStep = new LDrawStep();
@@ -81,6 +87,8 @@ namespace LDraw.Editor
             var currentRotationRef = -1;
             string modName = null;
             int modStart=0;
+            string alias = null;
+            string description = null;
 
             Dictionary<string, LDrawBuildMod> modInfo = new Dictionary<string, LDrawBuildMod>();
             Dictionary<int, LDrawBuildMod> buildMods = new Dictionary<int, LDrawBuildMod>();
@@ -91,7 +99,7 @@ namespace LDraw.Editor
                 if (line.StartsWith("3 ") || line.StartsWith("4 "))
                 {
                     // This is a geometry part
-                    return (steps, buildMods);
+                    return (steps, buildMods, alias, description);
                 }
             }
 
@@ -100,6 +108,17 @@ namespace LDraw.Editor
                 var line = lines[i];
                 if (line.StartsWith("0 "))
                 {
+                    if (line.StartsWith("0 COMMENT"))
+                    {
+                        var comment = line.Substring(10);
+                        var parts = comment.Split(':');
+                        if (parts.Length == 2)
+                        {
+                            alias = parts[0];
+                            description = parts[1];
+                        }
+                    }
+
                     var tokens = line.Trim().Split(' ');
                     if (tokens.Length > 1)
                     {
@@ -219,7 +238,7 @@ namespace LDraw.Editor
                 }
             }
                 
-            return (steps, buildMods);
+            return (steps, buildMods, alias, description);
         }
 
         public static void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps, 

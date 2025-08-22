@@ -114,10 +114,25 @@ namespace LDraw.Editor
         public GameObject GetGameObject(string partId, int color)
         {
             GameObject go; // = new GameObject(partId);
+            bool setColor = false;
             if (partCache.ContainsKey(partId))
             {
                 go = GameObject.Instantiate(partCache[partId].Item1.go);
+                setColor = true;
+            }
+            else if (submodelCache.ContainsKey(partId))
+            {
+                go = GameObject.Instantiate(submodelCache[partId]);
+                setColor = LDrawParser.partModels.ContainsKey(partId);
+            }
+            else
+            {
+                Debug.LogError($"Can't find part {partId}.");
+                return null;
+            }
 
+            if (setColor)
+            {
                 var material = GetOrCreateMaterial(color);
 
                 Renderer rend = go.GetComponent<Renderer>();
@@ -130,16 +145,7 @@ namespace LDraw.Editor
                         rend.sharedMaterials = sharedMats;
                         break;
                     }
-                }               
-            }
-            else if (submodelCache.ContainsKey(partId))
-            {
-                go = GameObject.Instantiate(submodelCache[partId]);
-            }
-            else
-            {
-                Debug.LogError($"Can't find part {partId}.");
-                return null;
+                }
             }
 
             return go;
@@ -726,13 +732,13 @@ namespace LDraw.Editor
             {
                 foreach (var part in step.parts)
                 {
-                    bool isPart = false;
+                    bool setColor = false;
                     Mesh meshCopy = null;
                     GameObject gameObject = null;
                     // decide if this is a part of submodel
                     if (partCache.ContainsKey(part.partId))
                     {
-                        isPart = true;
+                        setColor = true;
 
                         gameObject = GameObject.Instantiate(partCache[part.partId].Item1.go);
                         var meshFilter = gameObject.GetComponent<MeshFilter>();
@@ -746,6 +752,7 @@ namespace LDraw.Editor
                     }
                     else if (submodelCache.ContainsKey(part.partId))
                     {
+                        setColor = LDrawParser.partModels.ContainsKey(part.partId);
                         gameObject = submodelCache[part.partId];
                         var meshFilter = gameObject.GetComponent<MeshFilter>();
                         if (meshFilter == null)
@@ -776,7 +783,7 @@ namespace LDraw.Editor
                     meshCopy.normals = norms;
                     meshCopy.RecalculateBounds();
 
-                    if (isPart)
+                    if (setColor)
                     {
                         // Assign the main color
                         var ci = new CombineInstance
