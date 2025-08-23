@@ -8,6 +8,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.IO;
 using System;
+using UnityEngine.SceneManagement;
 
 namespace LDraw.Runtime
 {
@@ -54,7 +55,7 @@ namespace LDraw.Runtime
             var models = data.models;
             colors = data.colors;
             partDescriptions = data.partDescriptions;
-            modelNames = new HashSet<string>(models.Select(m=>m.modelName));
+            modelNames = new HashSet<string>(models.Select(m => m.modelName));
             var flatSteps = data.flatSteps;
 
             var color = colors[16].color;
@@ -71,6 +72,8 @@ namespace LDraw.Runtime
             partSpriteDict = LoadPartSprites();
             stepSprites = LoadStepSprites();
 
+            Load();
+
             PopulateSteps();
             UpdateStepText();
             ShowCurrentStep();
@@ -84,8 +87,8 @@ namespace LDraw.Runtime
             }
 
             if (showParts)
-            {              
-                leftPaneToggle.SelectItem(0, false);                
+            {
+                leftPaneToggle.SelectItem(0, false);
             }
             else
             {
@@ -94,11 +97,12 @@ namespace LDraw.Runtime
                 var model = stepManager.GetModel(currentStep);
                 if (navigator.CurrentModel != model)
                 {
-                    navigator.HideCurrentModel();               
+                    navigator.HideCurrentModel();
                 }
 
-                leftPaneToggle.Shrink(() => {
-                    navigator.GotoStep(currentStep, true);                
+                leftPaneToggle.Shrink(() =>
+                {
+                    navigator.GotoStep(currentStep, true);
                 });
             }
 
@@ -107,7 +111,7 @@ namespace LDraw.Runtime
         }
 
         private static Sprite[] LoadStepSprites()
-        {          
+        {
             Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawStepImages");
             var result = new Sprite[sprites.Length];
             foreach (var sprite in sprites)
@@ -149,9 +153,9 @@ namespace LDraw.Runtime
             var partInfo = new Dictionary<Sprite, (string, LeftPanelToggle.ItemContext)>();
             foreach (var kvp in parts)
             {
-                var part = kvp.Key;                
+                var part = kvp.Key;
                 var isModel = modelNames.Contains(part.partId);
-                string spriteKey = $"{part.partId.Replace('\\','_')}";
+                string spriteKey = $"{part.partId.Replace('\\', '_')}";
                 string colorName = null;
                 string id = null;
                 if (!isModel)
@@ -200,17 +204,17 @@ namespace LDraw.Runtime
             get
             {
                 return navigator != null && navigator.CanNavigate;
-            }            
+            }
         }
 
         private void HandleInput()
         {
-        #if UNITY_EDITOR || UNITY_STANDALONE
+#if UNITY_EDITOR || UNITY_STANDALONE
             if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 return;
             }
-        #endif
+#endif
 
             inputHandler.HandleInput();
         }
@@ -220,7 +224,7 @@ namespace LDraw.Runtime
             if (CanNavigate)
             {
                 HandleInput();
-            }            
+            }
         }
 
         public void ShowNextStep()
@@ -237,6 +241,7 @@ namespace LDraw.Runtime
                     {
                         currentStep++;
                         showParts = stepManager.GetStepParts(currentStep).Count > 0;
+                        Save();
                     }
                 }
 
@@ -259,6 +264,7 @@ namespace LDraw.Runtime
                     {
                         currentStep--;
                         showParts = false;
+                        Save();
                     }
                 }
 
@@ -268,7 +274,7 @@ namespace LDraw.Runtime
 
         private void UpdateStepText()
         {
-            stepNumberText.text = $"{currentStep+1}";
+            stepNumberText.text = $"{currentStep + 1}";
         }
 
         // Runtime-specific method to instantiate all parts from prefabs
@@ -303,7 +309,7 @@ namespace LDraw.Runtime
                             var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
 
                             Material[] sharedMats = renderer.sharedMaterials;
-                            for (var i=0;i<sharedMats.Length;i++)
+                            for (var i = 0; i < sharedMats.Length; i++)
                             {
                                 if (sharedMats[i] == mainMaterial)
                                 {
@@ -323,16 +329,35 @@ namespace LDraw.Runtime
 
         private void PopulateSteps()
         {
-            for (var i=0;i<stepSprites.Length;i++)
+            for (var i = 0; i < stepSprites.Length; i++)
             {
                 int stepIdx = i;
-                bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, ()=>
+                bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, () =>
                 {
                     currentStep = stepIdx;
-                    showParts = stepManager.GetStepParts(stepIdx).Count > 0;;
-                    ShowCurrentStep(); 
+                    showParts = stepManager.GetStepParts(stepIdx).Count > 0; ;
+                    Save();
+                    ShowCurrentStep();
                 });
             }
+        }
+
+        public void Back()
+        {
+            SceneManager.LoadScene("Home");
+        }
+
+        private void Load()
+        {
+            currentStep = PlayerPrefs.GetInt("CurrentStep", 0);
+            currentStep = Mathf.Clamp(currentStep, 0, stepManager.TotalStep - 1);
+        }
+
+        private void Save()
+        {
+            PlayerPrefs.SetInt("CurrentStep", currentStep);
+            PlayerPrefs.SetFloat("BuildProgress", (currentStep + 1f) / stepManager.TotalStep);
+            PlayerPrefs.Save(); // Force save to disk
         }
     }
 }

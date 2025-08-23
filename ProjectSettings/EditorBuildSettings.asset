@@ -6,8 +6,14 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/StepViewerTest.unity
+    path: Assets/Scenes/Build.unity
     guid: 836b6f035438dd04c900516e9765a45e
+  - enabled: 1
+    path: Assets/Scenes/Home.unity
+    guid: 8e53cca31ce45f9479cc5db96b020abc
+  - enabled: 1
+    path: Assets/Scenes/Gallery.unity
+    guid: 23409160915980546b8c89ec9ea44bcb
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 289c1b55c9541489481df5cc06664110, type: 3}
   m_UseUCBPForAssetBundles: 0
