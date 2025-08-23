@@ -54,7 +54,13 @@ namespace LDraw.Runtime
             var data = JsonConvert.DeserializeObject<StepPackage>(jsonAsset.text);
             var models = data.models;
             colors = data.colors;
-            partDescriptions = data.partDescriptions;
+            var jsonAsset2 = Resources.Load<TextAsset>("LDrawPartDescriptionData");
+            if (jsonAsset2 == null)
+            {
+                Debug.LogError("LDrawPartDescriptionData.json not found in Resources!");
+                return;
+            }
+            partDescriptions = JsonConvert.DeserializeObject<Dictionary<string, LDrawPartDesc>>(jsonAsset2.text);
             modelNames = new HashSet<string>(models.Select(m => m.modelName));
             var flatSteps = data.flatSteps;
 

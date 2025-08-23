@@ -393,9 +393,9 @@ namespace LDraw.Editor
         public void SaveModelsToJsonAsset(List<RuntimeModelData> models, List<FlatStep> flatSteps,
             Dictionary<int, LDrawColor> colors,
             Dictionary<string, LDrawPartDesc> partDescriptions,
-            string outputPath = "Assets/Resources/LDrawStepData.json")
+            List<LDrawPartCount> partCounts)
         {
-            var data = new StepPackage { colors = colors, partDescriptions = partDescriptions, models = models, flatSteps = flatSteps };
+            var data = new StepPackage { colors = colors, models = models, flatSteps = flatSteps };
 
             var settings = new JsonSerializerSettings()
             {
@@ -408,8 +408,17 @@ namespace LDraw.Editor
 
 
             string json = JsonConvert.SerializeObject(data, Formatting.Indented, settings);
-            File.WriteAllText(outputPath, json);
-            Debug.Log($"Saved model step data to {outputPath}");
+            var stepDataPath = "Assets/Resources/LDrawStepData.json";
+            File.WriteAllText(stepDataPath, json);
+            Debug.Log($"Saved model step data to {stepDataPath}");
+            var partDataCountPath = "Assets/Resources/LDrawPartCountData.json";
+            string json2 = JsonConvert.SerializeObject(partCounts, Formatting.Indented, settings);
+            File.WriteAllText(partDataCountPath, json2);
+            Debug.Log($"Saved model part data to {partDataCountPath}");
+            var partDescriptionPath = "Assets/Resources/LDrawPartDescriptionData.json";
+            string json3 = JsonConvert.SerializeObject(partDescriptions, Formatting.Indented, settings);
+            File.WriteAllText(partDescriptionPath, json3);
+            Debug.Log($"Saved model part data to {partDescriptionPath}");
             AssetDatabase.Refresh();
         }
 

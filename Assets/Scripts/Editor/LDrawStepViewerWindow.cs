@@ -3,10 +3,8 @@ using UnityEditor;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.RegularExpressions;
 using LDraw.Runtime;
 using System.Linq;
-using UnityEngine.Rendering;
 
 namespace LDraw.Editor
 {
@@ -436,9 +434,11 @@ namespace LDraw.Editor
             }         
 
             var flatSteps = new List<FlatStep>();
-            GenerateFlatSteps(flatSteps, models, 0, modelNames);
+            var partDescriptions = partLoader.GetPartDescriptions();
+            var partCounts = new Dictionary<LDrawPartCore, LDrawPartCount>();
+            GenerateFlatSteps(flatSteps, models, 0, modelNames, partCounts, partDescriptions);
 
-            partLoader.SaveModelsToJsonAsset(models, flatSteps, partLoader.GetUsedColors(), partLoader.GetPartDescriptions());
+            partLoader.SaveModelsToJsonAsset(models, flatSteps, partLoader.GetUsedColors(), partDescriptions, partCounts.Values.ToList());
 
             OnProgressUpdate(0f, "Creating model step previews...");
             yield return null;
@@ -556,7 +556,9 @@ namespace LDraw.Editor
             return RenderCamera(camera, rt);
         }
 
-        private void GenerateFlatSteps(List<FlatStep> flatSteps, List<RuntimeModelData> models, int modelIndex, Dictionary<string, int> modelNames)
+        private void GenerateFlatSteps(List<FlatStep> flatSteps, List<RuntimeModelData> models, int modelIndex,
+            Dictionary<string, int> modelNames, Dictionary<LDrawPartCore, LDrawPartCount> partCounts,
+            Dictionary<string, LDrawPartDesc> partDescpritions)
         {
             var model = models[modelIndex];
             var steps = model.steps;
@@ -567,7 +569,26 @@ namespace LDraw.Editor
                 {
                     if (modelNames.ContainsKey(part.partId))
                     {
-                        GenerateFlatSteps(flatSteps, models, modelNames[part.partId], modelNames);
+                        GenerateFlatSteps(flatSteps, models, modelNames[part.partId], modelNames, partCounts, partDescpritions);
+                    }
+                    else
+                    {
+                        var partId = partDescpritions.ContainsKey(part.partId) && partDescpritions[part.partId].id != null
+                            ? partDescpritions[part.partId].id
+                            : part.partId;
+                        var key = new LDrawPartCore { partId = partId, color = part.color };
+                        if (partCounts.ContainsKey(key))
+                        {
+                            partCounts[key].count++;
+                        }
+                        else
+                        {
+                            partCounts[key] = new LDrawPartCount
+                                {
+                                    part = new LDrawPartCore { partId = part.partId, color = part.color },
+                                    count = 1
+                                };
+                        }
                     }
                 }
 

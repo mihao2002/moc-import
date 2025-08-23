@@ -23,6 +23,13 @@ namespace LDraw.Runtime
     }
 
     [Serializable]
+    public class LDrawPartCount
+    {
+        public LDrawPartCore part;
+        public int count;
+    }
+
+    [Serializable]
     public class LDrawPartCore
     {
         public string partId;
@@ -30,7 +37,7 @@ namespace LDraw.Runtime
 
         public override bool Equals(object obj)
         {
-            return obj is LDrawPart other &&
+            return obj is LDrawPartCore other &&
                     partId == other.partId &&
                     color == other.color;
         }
@@ -90,7 +97,6 @@ namespace LDraw.Runtime
     public class StepPackage
     {
         public Dictionary<int, LDrawColor> colors;
-        public Dictionary<string, LDrawPartDesc> partDescriptions;
         public List<RuntimeModelData> models;
         public List<FlatStep> flatSteps;
     }  
