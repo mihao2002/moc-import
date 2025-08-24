@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\LDrawRuntime\InputHandler.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\PartGridItem.cs" />
+    <Compile Include="Assets\Scripts\LDrawRuntime\LDrawPartCollector.cs" />
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
     <Compile Include="Assets\Scripts\UI\BottomPanelToggle.cs" />
     <Compile Include="Assets\Outlines\OutlinePassFilter.cs" />

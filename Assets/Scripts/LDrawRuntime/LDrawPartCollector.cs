@@ -1,0 +1,387 @@
+using System.Collections.Generic;
+using UnityEngine;
+using TMPro;
+using Newtonsoft.Json;
+using UnityEngine.InputSystem;
+using System.Linq;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using System.IO;
+using System;
+using UnityEngine.SceneManagement;
+using UnityEngine.Rendering;
+
+namespace LDraw.Runtime
+{
+    public class LDrawPartCollector : MonoBehaviour
+    {
+        public Transform parentContainer; // Where to spawn parts in the scene
+        // public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
+        public TMP_Text partCountText;
+        public TMP_Text thisPartCountText;
+
+        public TMP_Text partIdText;
+        public TMP_Text partColorText;
+        public TMP_Text partDescText;
+        public Camera previewCamera; // Assign in inspector
+
+        // public LeftPanelToggle leftPaneToggle;
+        public BottomPanelToggle bottomPaneToggle;
+        // public GameObject stepPrefab;
+        // public Transform stepListParent;
+
+        private LDrawCamera cam;
+
+        // private bool suppressSliderCallback = false;
+        private Dictionary<string, Sprite> partSpriteDict;
+
+        private InputHandler inputHandler;
+        private Dictionary<int, LDrawColor> colors;
+        private Dictionary<string, LDrawPartDesc> partDescriptions;
+        
+        private List<LDrawPartCount> partCounts;
+        private bool[] partCollectionStatus;
+        private int totalCollectedCount;
+        private int totalCount;
+        private List<GameObject> partObjects;
+        private int currentPart;
+        private bool showCollected;
+
+        private Material mainMaterial;
+
+        void Start()
+        {
+            // Load model step data from Resources
+            var jsonAsset = Resources.Load<TextAsset>("LDrawPartCountData");
+            if (jsonAsset == null)
+            {
+                Debug.LogError("LDrawPartCountData.json not found in Resources!");
+                return;
+            }
+            partCounts = JsonConvert.DeserializeObject<List<LDrawPartCount>>(jsonAsset.text);
+            // var models = data.models;
+            var jsonAsset2 = Resources.Load<TextAsset>("LDrawPartDescriptionData");
+            if (jsonAsset2 == null)
+            {
+                Debug.LogError("LDrawPartDescriptionData.json not found in Resources!");
+                return;
+            }
+            partDescriptions = JsonConvert.DeserializeObject<Dictionary<string, LDrawPartDesc>>(jsonAsset2.text);
+
+            var jsonAsset3 = Resources.Load<TextAsset>("LDrawPartColorData");
+            if (jsonAsset3 == null)
+            {
+                Debug.LogError("LDrawPartColorData.json not found in Resources!");
+                return;
+            }
+            colors = JsonConvert.DeserializeObject<Dictionary<int, LDrawColor>>(jsonAsset3.text);
+
+            // modelNames = new HashSet<string>(models.Select(m => m.modelName));
+            // var flatSteps = data.flatSteps;
+
+            var color = colors[16].color;
+            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            mainMaterial = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+            partObjects = new List<GameObject>();
+            currentPart = -1;
+            showCollected = false;
+
+
+
+            PreInstantiateAllParts(partCounts, colors); // Runtime-specific: instantiate from prefabs
+
+            cam = new LDrawCamera(previewCamera, false);
+            // navigator = new LDrawFlatStepNavigator(models, cam, flatSteps);
+            // stepManager = new LDrawStepManager(models, flatSteps);
+            inputHandler = new InputHandler(cam);
+
+            partSpriteDict = LoadPartSprites();
+            // stepSprites = LoadStepSprites();
+
+            totalCount = partCounts.Select(c => c.count).Sum();
+            partCollectionStatus = new bool[partCounts.Count];
+            totalCollectedCount = 0;
+            Load();
+
+            PopulateParts();
+            UpdateCountText();
+            UpdatePartList();
+
+            var idx = FindNextWrapping(0, 1);
+            SetSelectedItem(idx);
+
+            // ShowCurrentStep();
+        }
+
+        /// <summary>
+        /// Loads all sprites from Resources/LDrawImages folder into nested dictionary [subfolder][filename] = Sprite
+        /// Assumes sprites are imported in Resources/LDrawImages and subfolders.
+        /// </summary>
+        private static Dictionary<string, Sprite> LoadPartSprites()
+        {
+            var result = new Dictionary<string, Sprite>();
+
+            Sprite[] sprites = Resources.LoadAll<Sprite>("LDrawImages");
+            foreach (var sprite in sprites)
+            {
+                result[sprite.name] = sprite;
+            }
+
+            return result;
+        }
+
+
+        private void HandleInput()
+        {
+#if UNITY_EDITOR || UNITY_STANDALONE
+            if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
+            {
+                return;
+            }
+#endif
+
+            inputHandler.HandleInput();
+        }
+
+        private void UpdateCountText()
+        {
+            var r = showCollected ? totalCollectedCount : (totalCount - totalCollectedCount);
+            partCountText.text = $"{r}";
+        }
+
+        public void Update()
+        {
+            HandleInput();
+        }
+
+        private int FindNextWrapping(int idx, int delta)
+        {
+            if (showCollected && totalCollectedCount == totalCount ||
+                !showCollected && totalCollectedCount == 0)
+            {
+                return -1;                    
+            }
+            
+            while (partCollectionStatus[idx] == showCollected)
+            {
+                idx = (idx + delta) % partCounts.Count;
+            }
+
+            return idx;
+        }
+
+        public void ShowNextPart()
+        {
+            var idx = FindNextWrapping(currentPart+1, 1);
+            if (idx >= 0)
+            {
+                Debug.LogError($"ShowNextPart {idx}");
+                SetSelectedItem(idx);
+            }
+        }
+
+        public void ShowPreviousPart()
+        {
+            var idx = FindNextWrapping(currentPart+1, -1);
+            if (idx >= 0)
+            {
+                Debug.LogError($"ShowPreviousPart {idx}");
+                SetSelectedItem(idx);
+            }
+        }
+
+        // Runtime-specific method to instantiate all parts from prefabs
+        private void PreInstantiateAllParts(List<LDrawPartCount> partCounts, Dictionary<int, LDrawColor> colors)
+        {
+            foreach (var partCount in partCounts)
+            {
+                var part = partCount.part;
+                var fileName = part.partId.Replace('\\', '_');
+                GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{fileName}");
+                if (prefab == null)
+                {
+                    Debug.LogWarning($"Missing prefab for part: {part.partId}");
+                    continue;
+                }
+                GameObject go = Instantiate(prefab, parentContainer);
+                // go.transform.localPosition = part.position;
+                // go.transform.localRotation = part.rotation;
+                // if (!modelNames.Contains(part.partId))
+                // {
+
+                // Regular part: ensure it has a renderer, assign material asset if found
+                var renderer = go.GetComponent<Renderer>();
+                if (renderer == null)
+                    renderer = go.AddComponent<MeshRenderer>();
+                var color = colors[part.color].color;
+                string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
+                var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+
+                Material[] sharedMats = renderer.sharedMaterials;
+                for (var i = 0; i < sharedMats.Length; i++)
+                {
+                    if (sharedMats[i] == mainMaterial)
+                    {
+                        sharedMats[i] = mat;
+                        renderer.sharedMaterials = sharedMats;
+                        break;
+                    }
+                }
+
+                int previewLayer = LayerMask.NameToLayer(Consts.PreviewLayerName);
+                go.layer = previewLayer;
+                go.SetActive(false);
+
+                partObjects.Add(go);
+                
+                // }
+                // objs.Add(go);
+            }
+        }
+
+        private void PopulateParts()
+        {
+            for (var i = 0; i < partCounts.Count; i++)
+            {
+                var partIdx = i;
+                var part = partCounts[i].part;
+                string spriteKey = $"{part.partId.Replace('\\', '_')}";
+                string colorName = null;
+                string id = null;
+                var color = colors[part.color];
+                colorName = color.name;
+                id = Path.GetFileNameWithoutExtension(part.partId);
+                spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{spriteKey}";
+
+                bottomPaneToggle.AddStep(partSpriteDict[spriteKey], partCounts[i].count, () =>
+                {
+                    SetSelectedItem(partIdx);
+                    // showParts = stepManager.GetStepParts(stepIdx).Count > 0; ;
+                    // Save();
+                    // ShowCurrentStep();
+                });
+            }
+        }
+
+        private void UpdatePartList()
+        {
+            for (var i = 0; i < partCollectionStatus.Length; i++)
+            {
+                bottomPaneToggle.ShowItem(i, showCollected ^ partCollectionStatus[i]);
+            }
+        }
+
+        private void SetSelectedItem(int index)
+        {
+            if (currentPart >= 0)
+            {
+                partObjects[currentPart].SetActive(false);
+            }
+
+            currentPart = index;
+
+            if (currentPart >= 0 && currentPart < partCounts.Count)
+            {
+                // if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+                // {
+                //     items[this.selectedItem].Deselect();
+                // }
+
+                // this.selectedItem = index;
+                // if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+                // {
+                //     items[this.selectedItem].Select();
+                //     var context = items[this.selectedItem].Context as ItemContext;
+                //     GameObject clone = Instantiate(context.Go);
+
+                var partObj = partObjects[currentPart];
+                partObj.SetActive(true);
+
+                // Optional: reset local transforms
+                partObj.transform.position = Vector3.zero;
+                partObj.transform.rotation = Quaternion.identity;
+
+                var part = partCounts[currentPart].part;
+                var partId = partDescriptions.ContainsKey(part.partId) && partDescriptions[part.partId].id != null
+                    ? partDescriptions[part.partId].id
+                    : part.partId;
+
+                PreviewItem(partId, partDescriptions[part.partId].description, colors[part.color].name, partObj, partCounts[currentPart].count);
+            }
+            // }        
+        }
+
+        public void SwithMode()
+        {
+            showCollected = !showCollected;
+            UpdatePartList();
+            UpdateCountText();
+        }
+
+        private void PreviewItem(string id, string desc, string colorName, GameObject previewPart, int count)
+        {
+            Bounds bounds = previewPart.GetComponent<Renderer>().bounds;
+            float radius = bounds.extents.magnitude;
+            var rotation = LDrawCamera.DefaultRotation;
+
+            cam.SetCamera(bounds.center, radius, rotation);
+            partIdText.text = id;
+            partColorText.text = colorName;
+            partDescText.text = desc;
+            thisPartCountText.text = $"x{count}";
+        }
+
+        public void CollectCurrent()
+        {
+            if (currentPart >= 0)
+            {
+                partCollectionStatus[currentPart] = showCollected;
+                totalCollectedCount += showCollected ? partCounts[currentPart].count : -partCounts[currentPart].count;
+                bottomPaneToggle.ShowItem(currentPart, false);
+                UpdateCountText();
+                Save();
+
+                var idx = FindNextWrapping(currentPart, 1);
+                SetSelectedItem(idx);
+            }
+        }
+
+        public void Back()
+        {
+            SceneManager.LoadScene("Home");
+        }
+
+        private void Load()
+        {
+            if (PlayerPrefs.HasKey("CollectionStatus"))
+            {
+                //00100101
+                var statusString = PlayerPrefs.GetString("CollectionStatus");
+                var statuses = statusString.ToCharArray();
+                var collectedCount = 0;
+                if (partCollectionStatus.Length == statuses.Length)
+                {
+                    for (var i = 0; i < statuses.Length; i++)
+                    {
+                        partCollectionStatus[i] = statuses[i] == '1';
+                        if (partCollectionStatus[i])
+                        {
+                            collectedCount += partCounts[i].count;
+                        }
+                        
+                    }
+
+                    totalCollectedCount = collectedCount;
+                }
+            }
+            // currentStep = PlayerPrefs.GetInt("CurrentStep", 0);
+            // currentStep = Mathf.Clamp(currentStep, 0, stepManager.TotalStep - 1);
+        }
+
+        private void Save()
+        {
+            var statuses = partCollectionStatus.Select(s => s ? '1' : '0').ToArray();
+            PlayerPrefs.SetString("CollectionStatus", new string(statuses));
+        }
+    }
+}

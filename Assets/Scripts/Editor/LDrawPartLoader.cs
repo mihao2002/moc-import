@@ -395,7 +395,7 @@ namespace LDraw.Editor
             Dictionary<string, LDrawPartDesc> partDescriptions,
             List<LDrawPartCount> partCounts)
         {
-            var data = new StepPackage { colors = colors, models = models, flatSteps = flatSteps };
+            var data = new StepPackage { models = models, flatSteps = flatSteps };
 
             var settings = new JsonSerializerSettings()
             {
@@ -419,6 +419,10 @@ namespace LDraw.Editor
             string json3 = JsonConvert.SerializeObject(partDescriptions, Formatting.Indented, settings);
             File.WriteAllText(partDescriptionPath, json3);
             Debug.Log($"Saved model part data to {partDescriptionPath}");
+            var colorPath = "Assets/Resources/LDrawPartColorData.json";
+            string json4 = JsonConvert.SerializeObject(colors, Formatting.Indented, settings);
+            File.WriteAllText(colorPath, json4);
+            Debug.Log($"Saved color data to {colorPath}");
             AssetDatabase.Refresh();
         }
 

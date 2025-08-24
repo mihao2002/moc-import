@@ -65,6 +65,11 @@ public class BottomPanelToggle : MonoBehaviour
             slider.value = (float)index/(items.Count-1);
         }        
     }
+    
+    public void ShowItem(int index, bool show)
+    {
+        items[index].gameObject.SetActive(show);
+    }
 
     public void AddStep(Sprite sprite, int step, Action action)
     {
@@ -76,7 +81,7 @@ public class BottomPanelToggle : MonoBehaviour
 
         items.Add(itemUI);
 
-        itemUI.SetContent(sprite, $"{step+1}", action);
+        itemUI.SetContent(sprite, $"{step + 1}", action);
     }
 
     void Hide()

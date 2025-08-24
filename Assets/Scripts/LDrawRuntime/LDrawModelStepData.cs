@@ -96,7 +96,6 @@ namespace LDraw.Runtime
     [Serializable]
     public class StepPackage
     {
-        public Dictionary<int, LDrawColor> colors;
         public List<RuntimeModelData> models;
         public List<FlatStep> flatSteps;
     }  
