@@ -71,7 +71,7 @@ public class BottomPanelToggle : MonoBehaviour
         items[index].gameObject.SetActive(show);
     }
 
-    public void AddStep(Sprite sprite, int step, Action action)
+    public void AddItem(Sprite sprite, string text, Action action)
     {
         // Create new item under the parent
         GameObject obj = Instantiate(stepPrefab, stepListParent);
@@ -81,7 +81,7 @@ public class BottomPanelToggle : MonoBehaviour
 
         items.Add(itemUI);
 
-        itemUI.SetContent(sprite, $"{step + 1}", action);
+        itemUI.SetContent(sprite, text, action);
     }
 
     void Hide()

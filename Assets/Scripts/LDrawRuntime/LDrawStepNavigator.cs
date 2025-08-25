@@ -346,7 +346,7 @@ namespace LDraw.Runtime
             for (var i = 0; i < stepSprites.Length; i++)
             {
                 int stepIdx = i;
-                bottomPaneToggle.AddStep(stepSprites[stepIdx], stepIdx, () =>
+                bottomPaneToggle.AddItem(stepSprites[stepIdx], $"{stepIdx+1}", () =>
                 {
                     currentStep = stepIdx;
                     showParts = stepManager.GetStepParts(stepIdx).Count > 0; ;

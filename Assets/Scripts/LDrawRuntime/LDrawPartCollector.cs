@@ -16,13 +16,25 @@ namespace LDraw.Runtime
     public class LDrawPartCollector : MonoBehaviour
     {
         public Transform parentContainer; // Where to spawn parts in the scene
-        // public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public TMP_Text partCountText;
         public TMP_Text thisPartCountText;
 
         public TMP_Text partIdText;
         public TMP_Text partColorText;
         public TMP_Text partDescText;
+
+        public GameObject partDetail;
+        public TMP_Text noPartText;
+
+        public Sprite intoBasketSprite;
+        public Sprite outofBasketSprite;
+
+        public Sprite findPartSprite;
+        public Sprite ownPartSprite;
+
+        public Image typeImage;
+        public Image actionImage;
+
         public Camera previewCamera; // Assign in inspector
 
         // public LeftPanelToggle leftPaneToggle;
@@ -46,6 +58,8 @@ namespace LDraw.Runtime
         private List<GameObject> partObjects;
         private int currentPart;
         private bool showCollected;
+        private List<int> partInLoop;
+        private int currentActivePart = -1;
 
         private Material mainMaterial;
 
@@ -76,9 +90,6 @@ namespace LDraw.Runtime
             }
             colors = JsonConvert.DeserializeObject<Dictionary<int, LDrawColor>>(jsonAsset3.text);
 
-            // modelNames = new HashSet<string>(models.Select(m => m.modelName));
-            // var flatSteps = data.flatSteps;
-
             var color = colors[16].color;
             string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
             mainMaterial = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
@@ -86,31 +97,40 @@ namespace LDraw.Runtime
             currentPart = -1;
             showCollected = false;
 
-
-
             PreInstantiateAllParts(partCounts, colors); // Runtime-specific: instantiate from prefabs
 
             cam = new LDrawCamera(previewCamera, false);
-            // navigator = new LDrawFlatStepNavigator(models, cam, flatSteps);
-            // stepManager = new LDrawStepManager(models, flatSteps);
             inputHandler = new InputHandler(cam);
 
             partSpriteDict = LoadPartSprites();
-            // stepSprites = LoadStepSprites();
 
             totalCount = partCounts.Select(c => c.count).Sum();
             partCollectionStatus = new bool[partCounts.Count];
             totalCollectedCount = 0;
             Load();
 
+            partInLoop = new List<int>();
             PopulateParts();
             UpdateCountText();
             UpdatePartList();
 
-            var idx = FindNextWrapping(0, 1);
-            SetSelectedItem(idx);
+            UpdateImages();
 
-            // ShowCurrentStep();
+            SetSelectedItem(0);
+        }
+
+        private void UpdateImages()
+        {
+            if (showCollected)
+            {
+                typeImage.sprite = ownPartSprite;
+                actionImage.sprite = outofBasketSprite;
+            }
+            else
+            {
+                typeImage.sprite = findPartSprite;
+                actionImage.sprite = intoBasketSprite;
+            }
         }
 
         /// <summary>
@@ -145,8 +165,7 @@ namespace LDraw.Runtime
 
         private void UpdateCountText()
         {
-            var r = showCollected ? totalCollectedCount : (totalCount - totalCollectedCount);
-            partCountText.text = $"{r}";
+            partCountText.text = $"{totalCollectedCount}";
         }
 
         public void Update()
@@ -154,39 +173,19 @@ namespace LDraw.Runtime
             HandleInput();
         }
 
-        private int FindNextWrapping(int idx, int delta)
-        {
-            if (showCollected && totalCollectedCount == totalCount ||
-                !showCollected && totalCollectedCount == 0)
-            {
-                return -1;                    
-            }
-            
-            while (partCollectionStatus[idx] == showCollected)
-            {
-                idx = (idx + delta) % partCounts.Count;
-            }
-
-            return idx;
-        }
-
         public void ShowNextPart()
         {
-            var idx = FindNextWrapping(currentPart+1, 1);
-            if (idx >= 0)
+            if (currentPart < partInLoop.Count - 1)
             {
-                Debug.LogError($"ShowNextPart {idx}");
-                SetSelectedItem(idx);
+                SetSelectedItem(currentPart+1);
             }
         }
 
         public void ShowPreviousPart()
         {
-            var idx = FindNextWrapping(currentPart+1, -1);
-            if (idx >= 0)
+            if (currentPart > 0)
             {
-                Debug.LogError($"ShowPreviousPart {idx}");
-                SetSelectedItem(idx);
+                SetSelectedItem(currentPart-1);
             }
         }
 
@@ -204,10 +203,6 @@ namespace LDraw.Runtime
                     continue;
                 }
                 GameObject go = Instantiate(prefab, parentContainer);
-                // go.transform.localPosition = part.position;
-                // go.transform.localRotation = part.rotation;
-                // if (!modelNames.Contains(part.partId))
-                // {
 
                 // Regular part: ensure it has a renderer, assign material asset if found
                 var renderer = go.GetComponent<Renderer>();
@@ -233,9 +228,6 @@ namespace LDraw.Runtime
                 go.SetActive(false);
 
                 partObjects.Add(go);
-                
-                // }
-                // objs.Add(go);
             }
         }
 
@@ -253,60 +245,64 @@ namespace LDraw.Runtime
                 id = Path.GetFileNameWithoutExtension(part.partId);
                 spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{spriteKey}";
 
-                bottomPaneToggle.AddStep(partSpriteDict[spriteKey], partCounts[i].count, () =>
+                bottomPaneToggle.AddItem(partSpriteDict[spriteKey], $"{partCounts[i].count}", () =>
                 {
-                    SetSelectedItem(partIdx);
-                    // showParts = stepManager.GetStepParts(stepIdx).Count > 0; ;
-                    // Save();
-                    // ShowCurrentStep();
+                    SetSelectedItem(partInLoop.IndexOf(partIdx));
                 });
             }
         }
 
         private void UpdatePartList()
         {
+            partInLoop.Clear();
             for (var i = 0; i < partCollectionStatus.Length; i++)
             {
-                bottomPaneToggle.ShowItem(i, showCollected ^ partCollectionStatus[i]);
+                var show = showCollected ^ !partCollectionStatus[i];
+                bottomPaneToggle.ShowItem(i, show);
+                if (show)
+                    partInLoop.Add(i);
             }
         }
 
         private void SetSelectedItem(int index)
         {
-            if (currentPart >= 0)
+            if (currentActivePart >= 0)
             {
-                partObjects[currentPart].SetActive(false);
+                partObjects[currentActivePart].SetActive(false);
+                currentActivePart = -1;
             }
 
             currentPart = index;
+            if (currentPart < 0) currentPart = 0;
+            if (currentPart >= partInLoop.Count) currentPart = partInLoop.Count - 1;
 
-            if (currentPart >= 0 && currentPart < partCounts.Count)
+            if (currentPart >= 0 && currentPart < partInLoop.Count)
             {
-                // if (this.selectedItem >= 0 && this.selectedItem < items.Count)
-                // {
-                //     items[this.selectedItem].Deselect();
-                // }
+                noPartText.gameObject.SetActive(false);
+                partDetail.SetActive(true);
+                var partIdx = partInLoop[currentPart];
 
-                // this.selectedItem = index;
-                // if (this.selectedItem >= 0 && this.selectedItem < items.Count)
-                // {
-                //     items[this.selectedItem].Select();
-                //     var context = items[this.selectedItem].Context as ItemContext;
-                //     GameObject clone = Instantiate(context.Go);
-
-                var partObj = partObjects[currentPart];
+                var partObj = partObjects[partIdx];
                 partObj.SetActive(true);
+                currentActivePart = partIdx;
 
                 // Optional: reset local transforms
                 partObj.transform.position = Vector3.zero;
                 partObj.transform.rotation = Quaternion.identity;
 
-                var part = partCounts[currentPart].part;
+                var part = partCounts[partIdx].part;
                 var partId = partDescriptions.ContainsKey(part.partId) && partDescriptions[part.partId].id != null
                     ? partDescriptions[part.partId].id
                     : part.partId;
 
-                PreviewItem(partId, partDescriptions[part.partId].description, colors[part.color].name, partObj, partCounts[currentPart].count);
+                PreviewItem(partId, partDescriptions[part.partId].description, colors[part.color].name, partObj, partCounts[partIdx].count);
+            }
+            else
+            {
+                currentPart = -1;
+                noPartText.text = showCollected ? "You haven't collected any part." : "You have collected all parts!";
+                noPartText.gameObject.SetActive(true);
+                partDetail.SetActive(false);
             }
             // }        
         }
@@ -316,6 +312,8 @@ namespace LDraw.Runtime
             showCollected = !showCollected;
             UpdatePartList();
             UpdateCountText();
+            SetSelectedItem(0);
+            UpdateImages();
         }
 
         private void PreviewItem(string id, string desc, string colorName, GameObject previewPart, int count)
@@ -333,16 +331,17 @@ namespace LDraw.Runtime
 
         public void CollectCurrent()
         {
-            if (currentPart >= 0)
+            if (currentPart >= 0 && currentPart < partInLoop.Count)
             {
-                partCollectionStatus[currentPart] = showCollected;
-                totalCollectedCount += showCollected ? partCounts[currentPart].count : -partCounts[currentPart].count;
-                bottomPaneToggle.ShowItem(currentPart, false);
+                var partIdx = partInLoop[currentPart];
+                partCollectionStatus[partIdx] = !showCollected;
+                partInLoop.RemoveAt(currentPart);
+                totalCollectedCount += showCollected ? -partCounts[partIdx].count : partCounts[partIdx].count;
+                bottomPaneToggle.ShowItem(partIdx, false);
                 UpdateCountText();
                 Save();
 
-                var idx = FindNextWrapping(currentPart, 1);
-                SetSelectedItem(idx);
+                SetSelectedItem(currentPart);
             }
         }
 
@@ -374,8 +373,6 @@ namespace LDraw.Runtime
                     totalCollectedCount = collectedCount;
                 }
             }
-            // currentStep = PlayerPrefs.GetInt("CurrentStep", 0);
-            // currentStep = Mathf.Clamp(currentStep, 0, stepManager.TotalStep - 1);
         }
 
         private void Save()
