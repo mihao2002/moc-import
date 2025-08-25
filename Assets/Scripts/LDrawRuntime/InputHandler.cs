@@ -71,12 +71,14 @@ namespace LDraw.Runtime
             {
                 isDragging = true;
                 lastMousePosition = mouse.position.ReadValue();
+                Debug.LogError("mouse.leftButton.wasPressedThisFrame");
             }
             else if (mouse.leftButton.isPressed && isDragging)
             {
                 Vector2 currentPos = mouse.position.ReadValue();
                 Vector2 delta = currentPos - lastMousePosition;
                 lastMousePosition = currentPos;
+                Debug.LogError($"mouse.leftButton.isPressed && isDragging");
 
                 ApplyRotationDelta(delta);
             }

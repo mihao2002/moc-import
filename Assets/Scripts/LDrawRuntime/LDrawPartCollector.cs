@@ -99,6 +99,7 @@ namespace LDraw.Runtime
 
             PreInstantiateAllParts(partCounts, colors); // Runtime-specific: instantiate from prefabs
 
+            previewCamera.aspect = 1;
             cam = new LDrawCamera(previewCamera, false);
             inputHandler = new InputHandler(cam);
 
@@ -154,10 +155,11 @@ namespace LDraw.Runtime
         private void HandleInput()
         {
 #if UNITY_EDITOR || UNITY_STANDALONE
-            if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
-            {
-                return;
-            }
+            // if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
+            // {
+            //     Debug.LogError("IsPointerOverGameObject");
+            //     return;
+            // }
 #endif
 
             inputHandler.HandleInput();
@@ -245,7 +247,7 @@ namespace LDraw.Runtime
                 id = Path.GetFileNameWithoutExtension(part.partId);
                 spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{spriteKey}";
 
-                bottomPaneToggle.AddItem(partSpriteDict[spriteKey], $"{partCounts[i].count}", () =>
+                bottomPaneToggle.AddItem(partSpriteDict[spriteKey], $"x{partCounts[i].count}", () =>
                 {
                     SetSelectedItem(partInLoop.IndexOf(partIdx));
                 });
@@ -323,7 +325,7 @@ namespace LDraw.Runtime
             var rotation = LDrawCamera.DefaultRotation;
 
             cam.SetCamera(bounds.center, radius, rotation);
-            partIdText.text = id;
+            partIdText.text = id.EndsWith(".dat") ? id.Substring(0, id.Length-4) : id;
             partColorText.text = colorName;
             partDescText.text = desc;
             thisPartCountText.text = $"x{count}";
