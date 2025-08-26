@@ -10,27 +10,17 @@ public class LeftPanelToggle : MonoBehaviour
 {
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
-    // public RectTransform arrowImage;     // The arrow image inside the button
-    public Camera mainCamera;
-    public GridLayoutGroup grid;
     public GameObject partDetail;
     public GameObject expander;
     public Camera previewCamera;
     public TMP_Text partId;
     public TMP_Text partColor;
     public TMP_Text partDescriptions;
-    public RectTransform partImageContainer;
-    public RectTransform partInfo;
     public GameObject gridItemPrefab;  // The prefab for each item
     public Transform gridParent;       // The container with GridLayoutGroup
 
-    private float panelWidth = 300f;  // Width when panel is collapsed
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
-    private float columnWidth;
-    private float columnSpacing;
-    private int padding;
-    private int fixRowCount;
 
     private GameObject previewPart = null;
     private LDrawCamera ldrawCamera;
@@ -40,20 +30,6 @@ public class LeftPanelToggle : MonoBehaviour
 
     void Awake()
     {
-        var uiManager = UIManager.Instance;
-
-        grid.cellSize = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit);
-        columnWidth = uiManager.BaseUnit;
-        columnSpacing = 0;
-        padding = uiManager.Padding;
-        grid.constraintCount = uiManager.FixRowCount;
-        grid.padding = new RectOffset(padding, padding, uiManager.BaseUnit, 0);
-
-        partImageContainer.offsetMin = new Vector2(partImageContainer.offsetMin.x, uiManager.BaseUnit);
-        partInfo.offsetMax = new Vector2(partInfo.offsetMax.x, uiManager.BaseUnit);
-
-        fixRowCount = grid.constraintCount;
-
         partDetail.SetActive(false);
         expander.SetActive(false);
 
@@ -64,10 +40,10 @@ public class LeftPanelToggle : MonoBehaviour
 
     private void DestoryPreviewPart()
     {
-        if (this.previewPart != null)
+        if (previewPart != null)
         {
-            Destroy(this.previewPart);
-            this.previewPart = null;
+            Destroy(previewPart);
+            previewPart = null;
         }
     }
 
@@ -89,16 +65,16 @@ public class LeftPanelToggle : MonoBehaviour
 
     private void SetSelectedItem(int index)
     {
-        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+        if (selectedItem >= 0 && selectedItem < items.Count)
         {
-            items[this.selectedItem].Deselect();
+            items[selectedItem].Deselect();
         }
 
-        this.selectedItem = index;
-        if (this.selectedItem >= 0 && this.selectedItem < items.Count)
+        selectedItem = index;
+        if (selectedItem >= 0 && selectedItem < items.Count)
         {
-            items[this.selectedItem].Select();
-            var context = items[this.selectedItem].Context as ItemContext;
+            items[selectedItem].Select();
+            var context = items[selectedItem].Context as ItemContext;
             GameObject clone = Instantiate(context.Go);
 
             int previewLayer = LayerMask.NameToLayer(Consts.PreviewLayerName);
@@ -130,22 +106,12 @@ public class LeftPanelToggle : MonoBehaviour
     public void Shrink(Action action)
     {
         DestoryPreviewPart();
-        StartCoroutine(AnimateWidth(sidePanel, panelWidth, false, -1, false, action));
+
+        RectTransform rt = gridParent.GetComponent<RectTransform>();
+        var right = rt.localPosition.x + rt.rect.width;
+        StartCoroutine(AnimateWidth(sidePanel, right, false, -1, false, action));
         isExpanded = false;
     }
-
-    public void SetItemCount(int itemCount)
-    {
-        var columnCount = Mathf.CeilToInt(itemCount / (float)fixRowCount);
-
-        panelWidth = columnCount == 0 ? 0 : columnWidth * columnCount + columnSpacing * (columnCount - 1) + padding * 2;
-        float viewportX = panelWidth / Screen.width;
-        float viewportWidth = 1.0f - viewportX;
-        mainCamera.rect = new Rect(viewportX, 0, viewportWidth, 1);
-
-        partDetail.GetComponent<RectTransform>().offsetMin = new Vector2(panelWidth + columnWidth, 0);
-    }
-
 
     public class ItemContext
     {

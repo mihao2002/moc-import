@@ -3,22 +3,21 @@ using System.Collections;
 using System;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using Unity.Mathematics;
 
 public class BottomPanelToggle : MonoBehaviour
 {
     [Header("UI References")]
     public RectTransform sidePanel;      // The panel to expand/shrink
     public RectTransform arrowImage;     // The arrow image inside the button
-    public RectTransform previous;
-    public RectTransform next;
-    public RectTransform stepNumber;
-    public RectTransform expander;
-    public RectTransform sliderTrans;
     public Slider slider;
     public GameObject stepPrefab;
     public Transform stepListParent;
+    public RectTransform scrollViewer;
+
+    public Button expander;
     
-    private float paneHeight = 400f;
+    // private float paneHeight = 400f;
     private float itemSize = 80f;
 
     private bool isExpanded = false;
@@ -29,29 +28,15 @@ public class BottomPanelToggle : MonoBehaviour
     
     void Awake()
     {
-        var uiManager = UIManager.Instance;
+        itemSize = math.min(512f, Screen.height / 3.0f);
 
-        paneHeight = uiManager.BaseUnit * 3;        
-        itemSize = uiManager.BaseUnit*2;
-
-        // paneHeight = Screen.height / 3.0f;
-        sidePanel.sizeDelta = new Vector2(sidePanel.sizeDelta.x, paneHeight);
-        previous.sizeDelta = next.sizeDelta = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit);
-        expander.sizeDelta = new Vector2(uiManager.BaseUnit, uiManager.BaseUnit/2);
-
-        var padding = uiManager.Padding;
-        previous.anchoredPosition = new Vector2(padding, previous.anchoredPosition.y);
-        next.anchoredPosition = new Vector2(-padding, next.anchoredPosition.y);
-        stepNumber.anchoredPosition = new Vector2(-padding, stepNumber.anchoredPosition.y);
-
-        // Set left gap to 20
-        sliderTrans.offsetMin = new Vector2(uiManager.BaseUnit, sliderTrans.offsetMin.y);
-        sliderTrans.offsetMax = new Vector2(-uiManager.BaseUnit, sliderTrans.offsetMax.y);
-
-        Hide();
+        // Change the height (y of sizeDelta)
+        Vector2 size = scrollViewer.sizeDelta;
+        size.y = itemSize;  // set desired height
+        scrollViewer.sizeDelta = size;        
     }
 
-    public void SetSelectedItem(int index)
+    public void SetSelectedItem(int index, bool syncSlider)
     {
         if (this.selectedItem >= 0 && this.selectedItem < items.Count)
         {
@@ -62,7 +47,7 @@ public class BottomPanelToggle : MonoBehaviour
         if (this.selectedItem >= 0 && this.selectedItem < items.Count)
         {
             items[this.selectedItem].Select();
-            slider.value = (float)index/(items.Count-1);
+            if (syncSlider) slider.value = (float)index/(items.Count-1);
         }        
     }
     
@@ -84,20 +69,13 @@ public class BottomPanelToggle : MonoBehaviour
         itemUI.SetContent(sprite, text, action);
     }
 
-    void Hide()
-    {
-        sidePanel.anchoredPosition = new Vector2(sidePanel.anchoredPosition.x, -paneHeight);
-      
-        // Rotate the arrow 180 degrees around Z to flip it
-        arrowImage.localEulerAngles = new Vector3(0, 0, 0);
-    }
-
     // Call this method from the Button onClick event
     public void TogglePanel()
     {
         isExpanded = !isExpanded;
 
-        float targetY = isExpanded ? 0f : -paneHeight;
+        var paneHeight = sidePanel.rect.height;
+        float targetY = isExpanded ? paneHeight : 0;
 
         // Animate width change (optional)
         StartCoroutine(AnimateHeight(sidePanel, targetY, isExpanded));
@@ -121,5 +99,11 @@ public class BottomPanelToggle : MonoBehaviour
 
         // Rotate the arrow 180 degrees around Z to flip it
         arrowImage.localEulerAngles = isExpanded ? new Vector3(0, 0, 180) : new Vector3(0, 0, 0);
+        // Get the current colors
+        ColorBlock cb = expander.colors;
+        // Change the normal color
+        cb.normalColor = isExpanded ? Color.gray3 : Color.white;
+        // Assign it back
+        expander.colors = cb;
     }
 }

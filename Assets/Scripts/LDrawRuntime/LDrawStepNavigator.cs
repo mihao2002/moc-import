@@ -2,12 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using Newtonsoft.Json;
-using UnityEngine.InputSystem;
 using System.Linq;
-using UnityEngine.EventSystems;
-using UnityEngine.UI;
 using System.IO;
-using System;
 using UnityEngine.SceneManagement;
 
 namespace LDraw.Runtime
@@ -15,15 +11,11 @@ namespace LDraw.Runtime
     public class LDrawStepNavigator : MonoBehaviour
     {
         public Transform parentContainer; // Where to spawn parts in the scene
-        public TMP_Text navigationText; // Assign in inspector to show current model/step (TextMeshPro)
         public TMP_Text stepNumberText;
         public Camera mainCamera; // Assign in inspector
 
         public LeftPanelToggle leftPaneToggle;
         public BottomPanelToggle bottomPaneToggle;
-        // public GameObject stepPrefab;
-        public Transform stepListParent;
-
         private LDrawCamera cam;
 
         // private bool suppressSliderCallback = false;
@@ -93,7 +85,7 @@ namespace LDraw.Runtime
             ShowCurrentStep();
         }
 
-        private void ShowCurrentStep()
+        private void ShowCurrentStep(bool userClick=false)
         {
             if (partListStep != currentStep)
             {
@@ -120,7 +112,7 @@ namespace LDraw.Runtime
                 });
             }
 
-            bottomPaneToggle.SetSelectedItem(currentStep);
+            bottomPaneToggle.SetSelectedItem(currentStep, !userClick);
             UpdateStepText();
         }
 
@@ -209,7 +201,6 @@ namespace LDraw.Runtime
                 leftPaneToggle.AddItem(kvp.Key, kvp.Value.Item1, kvp.Value.Item2);
             }
 
-            leftPaneToggle.SetItemCount(partInfo.Count);
             partListStep = currentStep;
         }
 
@@ -223,12 +214,12 @@ namespace LDraw.Runtime
 
         private void HandleInput()
         {
-#if UNITY_EDITOR || UNITY_STANDALONE
-            if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
-            {
-                return;
-            }
-#endif
+// #if UNITY_EDITOR || UNITY_STANDALONE
+//             if (cam == null || (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
+//             {
+//                 return;
+//             }
+// #endif
 
             inputHandler.HandleInput();
         }
@@ -351,7 +342,7 @@ namespace LDraw.Runtime
                     currentStep = stepIdx;
                     showParts = stepManager.GetStepParts(stepIdx).Count > 0; ;
                     Save();
-                    ShowCurrentStep();
+                    ShowCurrentStep(true);
                 });
             }
         }

@@ -249,7 +249,7 @@ namespace LDraw.Runtime
 
                 bottomPaneToggle.AddItem(partSpriteDict[spriteKey], $"x{partCounts[i].count}", () =>
                 {
-                    SetSelectedItem(partInLoop.IndexOf(partIdx));
+                    SetSelectedItem(partInLoop.IndexOf(partIdx), true);
                 });
             }
         }
@@ -266,7 +266,7 @@ namespace LDraw.Runtime
             }
         }
 
-        private void SetSelectedItem(int index)
+        private void SetSelectedItem(int index, bool userClick = false)
         {
             if (currentActivePart >= 0)
             {
@@ -282,6 +282,8 @@ namespace LDraw.Runtime
             {
                 noPartText.gameObject.SetActive(false);
                 partDetail.SetActive(true);
+                thisPartCountText.gameObject.SetActive(true);
+
                 var partIdx = partInLoop[currentPart];
 
                 var partObj = partObjects[partIdx];
@@ -298,6 +300,7 @@ namespace LDraw.Runtime
                     : part.partId;
 
                 PreviewItem(partId, partDescriptions[part.partId].description, colors[part.color].name, partObj, partCounts[partIdx].count);
+                bottomPaneToggle.SetSelectedItem(partIdx, !userClick);
             }
             else
             {
@@ -305,6 +308,7 @@ namespace LDraw.Runtime
                 noPartText.text = showCollected ? "You haven't collected any part." : "You have collected all parts!";
                 noPartText.gameObject.SetActive(true);
                 partDetail.SetActive(false);
+                thisPartCountText.gameObject.SetActive(false);
             }
             // }        
         }
