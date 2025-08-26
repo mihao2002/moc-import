@@ -385,6 +385,7 @@ namespace LDraw.Runtime
         {
             var statuses = partCollectionStatus.Select(s => s ? '1' : '0').ToArray();
             PlayerPrefs.SetString("CollectionStatus", new string(statuses));
+            PlayerPrefs.SetFloat("CollectProgress", ((float)totalCollectedCount)/totalCount);            
         }
     }
 }

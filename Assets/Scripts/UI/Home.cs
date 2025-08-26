@@ -10,10 +10,17 @@ public class Home : MonoBehaviour
 
     void Start()
     {
+        buildProgressText.text = "";
+        if (PlayerPrefs.HasKey("CollectProgress"))
+        {
+            float progress = PlayerPrefs.GetFloat("CollectProgress");
+            buildProgressText.text += $"{Math.Floor(progress * 100)}% parts collected. ";
+        }
+
         if (PlayerPrefs.HasKey("BuildProgress"))
         {
             float progress = PlayerPrefs.GetFloat("BuildProgress");
-            buildProgressText.text = $"Building progress {Math.Floor(progress * 100)}%";
+            buildProgressText.text += $"You have built {Math.Floor(progress * 100)}%.";
         }
     }
 
@@ -32,8 +39,6 @@ public class Home : MonoBehaviour
         {
             // operation.progress goes from 0 → 0.9
             float progress = Mathf.Clamp01(operation.progress / 0.9f);
-            // progressBar.value = progress;
-            buildProgressText.text = (progress * 100f).ToString("F0") + "%";
 
             // once loading reaches 90% we can allow activation
             if (operation.progress >= 0.9f)
@@ -43,7 +48,7 @@ public class Home : MonoBehaviour
 
                 // if (Input.anyKeyDown) // or a button press
                 // {
-                    operation.allowSceneActivation = true;
+                operation.allowSceneActivation = true;
                 // }
             }
 

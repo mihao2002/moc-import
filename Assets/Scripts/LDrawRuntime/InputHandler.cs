@@ -13,7 +13,7 @@ namespace LDraw.Runtime
 {
     public class InputHandler
     {
-        private float minRadius = 0.5f;
+        private float minRadius = 0.2f;
         private float maxRadius = 30f;
 
         private LDrawCamera camera;
