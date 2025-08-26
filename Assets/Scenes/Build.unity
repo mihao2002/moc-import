@@ -978,6 +978,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mainCamera: {fileID: 367986510}
+  canvasScaler: {fileID: 1274449287}
 --- !u!1 &752216486
 GameObject:
   m_ObjectHideFlags: 0
@@ -2899,6 +2900,7 @@ MonoBehaviour:
   partDescriptions: {fileID: 1968483813}
   gridItemPrefab: {fileID: 4933899295792351037, guid: bd330aa4393f1be40a35b9dd5b0d815a, type: 3}
   gridParent: {fileID: 674575176}
+  canvasScaler: {fileID: 1274449287}
   animationDuration: 0.2
 --- !u!114 &2015060211
 MonoBehaviour:
@@ -3021,6 +3023,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: BottomPanel
       objectReference: {fileID: 0}
+    - target: {fileID: 4634572918950919424, guid: 2384704126a48ad4295160297fdcdfdb, type: 3}
+      propertyPath: canvasScaler
+      value: 
+      objectReference: {fileID: 1274449287}
     - target: {fileID: 4681910125346893155, guid: 2384704126a48ad4295160297fdcdfdb, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

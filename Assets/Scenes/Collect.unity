@@ -2079,6 +2079,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: BottomPanel
       objectReference: {fileID: 0}
+    - target: {fileID: 4634572918950919424, guid: 2384704126a48ad4295160297fdcdfdb, type: 3}
+      propertyPath: canvasScaler
+      value: 
+      objectReference: {fileID: 1274449287}
     - target: {fileID: 4681910125346893155, guid: 2384704126a48ad4295160297fdcdfdb, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

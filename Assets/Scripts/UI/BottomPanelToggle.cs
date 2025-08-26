@@ -15,6 +15,8 @@ public class BottomPanelToggle : MonoBehaviour
     public Transform stepListParent;
     public RectTransform scrollViewer;
 
+    public CanvasScaler canvasScaler;
+
     public Button expander;
     
     // private float paneHeight = 400f;
@@ -25,15 +27,16 @@ public class BottomPanelToggle : MonoBehaviour
 
     private int selectedItem = -1;
     private List<PartGridItem> items = new List<PartGridItem>();
-    
+
     void Awake()
     {
-        itemSize = math.min(512f, Screen.height / 3.0f);
+        var screenSize = UIManager.GetScreenSize(canvasScaler);      
+        itemSize = math.min(512f, screenSize.y / 3.0f);
 
         // Change the height (y of sizeDelta)
         Vector2 size = scrollViewer.sizeDelta;
         size.y = itemSize;  // set desired height
-        scrollViewer.sizeDelta = size;        
+        scrollViewer.sizeDelta = size;  
     }
 
     public void SetSelectedItem(int index, bool syncSlider)

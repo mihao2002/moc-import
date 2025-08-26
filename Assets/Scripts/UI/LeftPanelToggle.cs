@@ -19,6 +19,8 @@ public class LeftPanelToggle : MonoBehaviour
     public GameObject gridItemPrefab;  // The prefab for each item
     public Transform gridParent;       // The container with GridLayoutGroup
 
+    public CanvasScaler canvasScaler;
+
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
 
@@ -27,6 +29,7 @@ public class LeftPanelToggle : MonoBehaviour
     private InputHandler inputHandler;
     private int selectedItem = 0;
     private List<PartGridItem> items = new List<PartGridItem>();
+    private Vector2 screenSize;
 
     void Awake()
     {
@@ -36,6 +39,7 @@ public class LeftPanelToggle : MonoBehaviour
         previewCamera.aspect = 1;
         ldrawCamera = new LDrawCamera(previewCamera, false);
         inputHandler = new InputHandler(ldrawCamera);
+        screenSize = UIManager.GetScreenSize(canvasScaler);
     }
 
     private void DestoryPreviewPart()
@@ -97,7 +101,7 @@ public class LeftPanelToggle : MonoBehaviour
         }
         else
         {
-            StartCoroutine(AnimateWidth(sidePanel, Screen.width, true, selectedItem, shrinkable, null));
+            StartCoroutine(AnimateWidth(sidePanel, screenSize.x, true, selectedItem, shrinkable, null));
             isExpanded = true;
         }
         

@@ -5,14 +5,17 @@ using UnityEngine.UI;
 public class ResponsiveGrid : MonoBehaviour
 {
     public Camera mainCamera;
+    public CanvasScaler canvasScaler;
 
     private GridLayoutGroup grid;
     private int fixRowCount;
+    private Vector2 screenSize;
 
     void Awake()
     {
         grid = GetComponent<GridLayoutGroup>();
         fixRowCount = grid.constraintCount;
+        screenSize = UIManager.GetScreenSize(canvasScaler);
     }
 
     void Update()
@@ -23,7 +26,7 @@ public class ResponsiveGrid : MonoBehaviour
 
         grid.cellSize = new Vector2(cellSize, cellSize);
 
-        float viewportX = rt.rect.width / Screen.width;
+        float viewportX = rt.rect.width / screenSize.x;
         float viewportWidth = 1.0f - viewportX;
         mainCamera.rect = new Rect(viewportX, 0, viewportWidth, 1);
     }

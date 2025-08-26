@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Collections;
+using System.Numerics;
+using UnityEngine.UI;
+using Vector2 = UnityEngine.Vector2;
 
 public class UIManager
 {
@@ -57,5 +60,39 @@ public class UIManager
         {
             return fixRowCount;
         }
+    }
+
+public static Vector2 GetScreenSize(CanvasScaler scaler)
+    {
+        if (scaler == null) return new Vector2(Screen.width, Screen.height);
+
+        float width = Screen.width;
+        float height = Screen.height;
+
+        if (scaler.uiScaleMode == CanvasScaler.ScaleMode.ScaleWithScreenSize)
+        {
+            Vector2 reference = scaler.referenceResolution;
+            float widthScale = width / reference.x;
+            float heightScale = height / reference.y;
+            float scaleFactor = 1f;
+
+            switch (scaler.screenMatchMode)
+            {
+                case CanvasScaler.ScreenMatchMode.MatchWidthOrHeight:
+                    scaleFactor = Mathf.Lerp(widthScale, heightScale, scaler.matchWidthOrHeight);
+                    break;
+                case CanvasScaler.ScreenMatchMode.Expand:
+                    scaleFactor = Mathf.Min(widthScale, heightScale);
+                    break;
+                case CanvasScaler.ScreenMatchMode.Shrink:
+                    scaleFactor = Mathf.Max(widthScale, heightScale);
+                    break;
+            }
+
+            width = width / scaleFactor;
+            height = height / scaleFactor;
+        }
+
+        return new Vector2(width, height);
     }
 }
