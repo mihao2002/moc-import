@@ -10,6 +10,9 @@ using System.IO;
 using System;
 using UnityEngine.SceneManagement;
 using UnityEngine.Rendering;
+using System.Xml;
+using System.Xml.Linq;
+using UnityEngine.AI;
 
 namespace LDraw.Runtime
 {
@@ -41,6 +44,10 @@ namespace LDraw.Runtime
         public BottomPanelToggle bottomPaneToggle;
         // public GameObject stepPrefab;
         // public Transform stepListParent;
+
+        public GameObject orderPane;
+        public TMP_Text orderDescription;
+        public TMP_InputField fileName;
 
         private LDrawCamera cam;
 
@@ -104,6 +111,7 @@ namespace LDraw.Runtime
             inputHandler = new InputHandler(cam);
 
             partSpriteDict = LoadPartSprites();
+            orderPane.SetActive(false);
 
             totalCount = partCounts.Select(c => c.count).Sum();
             partCollectionStatus = new bool[partCounts.Count];
@@ -356,6 +364,77 @@ namespace LDraw.Runtime
             SceneManager.LoadScene("Home");
         }
 
+        public void Order()
+        {
+            orderPane.SetActive(true);
+            orderDescription.text = $"This will save {totalCount - totalCollectedCount} missing parts into an XML file for bricklink.com wanted list creation.";
+            fileName.text = "partlist.xml";            
+        }
+
+        public void CancelOrder()
+        {
+            orderPane.SetActive(false);            
+        }
+
+        private XDocument GetUncollectedPartXml()
+        {
+            var root = new XElement("INVENTORY");
+            for (var i = 0; i < partCounts.Count; i++)
+            {
+                if (!partCollectionStatus[i])
+                {
+                    var part = partCounts[i].part;
+                    var partId = part.partId;
+                    if (partDescriptions.ContainsKey(partId) && partDescriptions[partId].id != null)
+                    {
+                        partId = partDescriptions[partId].id;
+                    }
+                    else
+                    {
+                        partId = partId.Split('.')[0];
+                    }
+                    
+                    var item = new XElement("ITEM",
+                        new XElement("ITEMTYPE", "P"),
+                        new XElement("ITEMID", partId),
+                        new XElement("COLOR", part.color),
+                        new XElement("MINQTY", partCounts[i].count));
+                    root.Add(item);                     
+                }
+            }
+
+            return new XDocument(root);
+        }
+
+        public void SaveOrder()
+        {
+            string folder = Application.persistentDataPath;
+            var baseName = fileName.text;
+            var extension = ".xml";
+            if (baseName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            {
+                baseName = baseName.Substring(0, baseName.Length - 4);
+            }
+
+            string path = Path.Combine(folder, baseName + extension);
+            int counter = 2;
+
+            // Find available filename
+            while (File.Exists(path))
+            {
+                string newName = $"{baseName} ({counter++})";
+                path = Path.Combine(folder, newName + extension);
+            }
+
+            // Write content to file
+            var doc = GetUncollectedPartXml();
+            //File.WriteAllText(path, xml);
+            doc.Save(path);
+
+            Debug.Log("Saved at: " + path);
+            orderPane.SetActive(false);
+        }
+
         private void Load()
         {
             if (PlayerPrefs.HasKey("CollectionStatus"))
@@ -373,7 +452,7 @@ namespace LDraw.Runtime
                         {
                             collectedCount += partCounts[i].count;
                         }
-                        
+
                     }
 
                     totalCollectedCount = collectedCount;
