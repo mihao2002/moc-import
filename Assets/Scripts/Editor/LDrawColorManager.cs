@@ -12,19 +12,56 @@ namespace LDraw.Editor
     {
         // private static Dictionary<int, LDrawColor> _colorTable = new Dictionary<int, LDrawColor>();
 
-        // public static bool IsLoaded => _colorTable.Count > 0;
+        public static Dictionary<int, int> LoadLDrawToBLColorMap(string filePath)
+        {
+            var map = new Dictionary<int, int>();
 
-        public static Dictionary<int, LDrawColor> LoadFromFile(string ldconfigPath)
+            var lines = File.ReadAllLines(filePath);
+
+            // Skip header
+            for (int i = 1; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+
+                // Split by tab
+                var columns = line.Split('\t');
+
+                if (columns.Length < 3) continue; // ensure enough columns
+
+                string blCodeStr = columns[1];
+                string ldrawCodeStr = columns[2];
+
+                if (string.IsNullOrEmpty(blCodeStr)) continue; // skip if BL Color Code is empty
+
+                if (int.TryParse(ldrawCodeStr, out int ldrawCode) &&
+                    int.TryParse(blCodeStr, out int blCode))
+                {
+                    // Only add if not already present
+                    if (!map.ContainsKey(ldrawCode))
+                    {
+                        map[ldrawCode] = blCode;
+                    }
+                }
+            }
+
+            return map;
+        }
+
+
+        public static Dictionary<int, LDrawColor> LoadFromFile(string ldconfigPath, string studioColorPath)
         {
             // if (IsLoaded) return;
             Dictionary<int, LDrawColor> _colorTable = new Dictionary<int, LDrawColor>();
 
             // _colorTable.Clear();
-            if (!File.Exists(ldconfigPath))
+            if (!File.Exists(ldconfigPath) || !File.Exists(studioColorPath))
             {
-                Debug.LogError($"LDConfig.ldr file not found at: {ldconfigPath}");
+                Debug.LogError($"LDConfig.ldr file or Studio color file not found at: {ldconfigPath}");
                 return null;
             }
+
+            var colorMap = LoadLDrawToBLColorMap(studioColorPath);
 
             string[] lines = File.ReadAllLines(ldconfigPath);
             var colorEntries = new List<LDrawColorEntry>();
@@ -49,8 +86,15 @@ namespace LDraw.Editor
 
                     if (ColorUtility.TryParseHtmlString(hex, out Color color))
                     {
-                        _colorTable[code] = new LDrawColor{name = name,color=color};
-                        colorEntries.Add(new LDrawColorEntry { code = code, color = color });
+                        if (colorMap.ContainsKey(code))
+                        {
+                            _colorTable[code] = new LDrawColor { name = name, blColor = colorMap[code], color = color };
+                            colorEntries.Add(new LDrawColorEntry { code = code, color = color });
+                        }
+                        else
+                        {
+                            Debug.LogError($"Color code {code} doesn't exist in bricklink color map.");
+                        }
                     }
                     else
                     {

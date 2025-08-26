@@ -11,6 +11,8 @@ namespace LDraw.Runtime
     public class LDrawColor
     {
         public Color color;
+
+        public int blColor;
         public string name;
     }
 

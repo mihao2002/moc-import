@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using LDraw.Runtime;
 using System.Linq;
+using Unity.Collections;
+using UnityEngine.Rendering;
 
 namespace LDraw.Editor
 {
@@ -12,6 +14,7 @@ namespace LDraw.Editor
     {
         private string ldrawFilePath = "C:/Users/mihao/OneDrive/Documents/test.ldr";
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
+        private string studioDataPath = "C:/Program Files/Studio 2.0/data";
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial;C:/Models/Unofficial";
         private LDrawFlatStepNavigator navigator;
         
@@ -107,6 +110,16 @@ namespace LDraw.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
+            studioDataPath = EditorGUILayout.TextField("Studio Data Path", studioDataPath);
+            if (GUILayout.Button("...", GUILayout.Width(30)))
+            {
+                string path = EditorUtility.OpenFolderPanel("Select Studio Data Folder", "", "");
+                if (!string.IsNullOrEmpty(path))
+                    studioDataPath = path;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
             unofficialPartLibraryPath = EditorGUILayout.TextField("Unofficial Part Library Path", unofficialPartLibraryPath);
             if (GUILayout.Button("...", GUILayout.Width(30)))
             {
@@ -154,7 +167,8 @@ namespace LDraw.Editor
             isCancelled = false;
 
             string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
-            var colors = LDrawColorManager.LoadFromFile(ldconfigPath);
+            string studioColorPath = Path.Combine(studioDataPath, "StudioColorDefinition.txt");
+            var colors = LDrawColorManager.LoadFromFile(ldconfigPath, studioColorPath);
             var partLoader = new LDrawPartLoader(colors);
 
             OnProgressUpdate(0f, "Clearing cache...");
@@ -435,6 +449,25 @@ namespace LDraw.Editor
 
             var flatSteps = new List<FlatStep>();
             var partDescriptions = partLoader.GetPartDescriptions();
+
+            string studioPartPath = Path.Combine(studioDataPath, "StudioPartDefinition2.txt");
+            var blPartMap = LoadLDrawToBLPartMap(studioPartPath);
+            foreach (var kvp in partDescriptions)
+            {
+                var desc = partDescriptions[kvp.Key];
+                if (desc.id == null)
+                {
+                    if (blPartMap.ContainsKey(kvp.Key))
+                    {
+                        desc.id = blPartMap[kvp.Key];
+                    }
+                    else
+                    {
+                        Debug.LogError($"No bricklink part id found for {kvp.Key}");
+                    }
+                }
+            }
+
             var partCounts = new Dictionary<LDrawPartCore, LDrawPartCount>();
             GenerateFlatSteps(flatSteps, models, 0, modelNames, partCounts, partDescriptions);
 
@@ -478,6 +511,39 @@ namespace LDraw.Editor
 
             return new LDrawCamera(cam, false);
         }
+        
+        private static Dictionary<string, string> LoadLDrawToBLPartMap(string filePath)
+        {
+            var map = new Dictionary<string, string>();
+
+            var lines = File.ReadAllLines(filePath);
+
+            // Skip header
+            for (int i = 1; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+
+                // Split by tab
+                var columns = line.Split('\t');
+
+                if (columns.Length < 5) continue; // ensure enough columns
+
+                string blPartId = columns[2];
+                string ldrawPartId = columns[4];
+
+                if (string.IsNullOrEmpty(blPartId) || string.IsNullOrEmpty(ldrawPartId))
+                    continue; // skip if either is empty
+
+                // Only add if not already present
+                if (!map.ContainsKey(ldrawPartId))
+                {
+                    map[ldrawPartId] = blPartId;
+                }
+            }
+
+            return map;
+        }
 
         public static void CreateImage(string filename, GameObject go, LDrawCamera camera, RenderTexture rt)
         {
@@ -496,7 +562,7 @@ namespace LDraw.Editor
                 Directory.CreateDirectory(imageFolder);
 
             var image = GenerateImageFromMeshPrefabTransparent(go, camera, rt);
-            SaveTextureAsPNG(image, imagePath);         
+            SaveTextureAsPNG(image, imagePath);
         }
 
         public static void CreateStepImage(int step, LDrawCamera camera, RenderTexture rt)

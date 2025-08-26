@@ -367,7 +367,7 @@ namespace LDraw.Runtime
         public void Order()
         {
             orderPane.SetActive(true);
-            orderDescription.text = $"This will save {totalCount - totalCollectedCount} missing parts into an XML file for bricklink.com wanted list creation.";
+            orderDescription.text = $"You have owned {totalCollectedCount} parts.\nThis will create an XML file of {totalCount - totalCollectedCount} missing parts for bricklink.com wanted list creation.";
             fileName.text = "partlist.xml";            
         }
 
@@ -397,7 +397,7 @@ namespace LDraw.Runtime
                     var item = new XElement("ITEM",
                         new XElement("ITEMTYPE", "P"),
                         new XElement("ITEMID", partId),
-                        new XElement("COLOR", part.color),
+                        new XElement("COLOR", colors[part.color].blColor),
                         new XElement("MINQTY", partCounts[i].count));
                     root.Add(item);                     
                 }
