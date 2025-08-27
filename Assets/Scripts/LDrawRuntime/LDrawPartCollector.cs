@@ -362,7 +362,7 @@ namespace LDraw.Runtime
 
         public void Back()
         {
-            SceneManager.LoadScene("Home");
+            StartCoroutine(UIManager.LoadSceneDelayed("Home"));
         }
 
         public void Order()

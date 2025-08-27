@@ -22,7 +22,7 @@ public class Gallery : MonoBehaviour
     // Public method to load a scene by name
     public void Back()
     {
-        SceneManager.LoadScene("Home");
+            StartCoroutine(UIManager.LoadSceneDelayed("Home"));
     }
 
     public void Previous()

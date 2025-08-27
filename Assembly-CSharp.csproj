@@ -54,6 +54,7 @@
     <Compile Include="Assets\Scripts\UI\ResponsiveGrid.cs" />
     <Compile Include="Assets\Scripts\CameraOrbitByAngles.cs" />
     <Compile Include="Assets\Scripts\UI\BottomPanelToggle.cs" />
+    <Compile Include="Assets\Scripts\UI\ButtonSoundManager.cs" />
     <Compile Include="Assets\Outlines\OutlinePassFilter.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\Consts.cs" />
     <Compile Include="Assets\Scripts\LDrawRuntime\LDrawFlatStepNavigator.cs" />

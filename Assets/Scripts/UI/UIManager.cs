@@ -3,6 +3,7 @@ using System.Collections;
 using System.Numerics;
 using UnityEngine.UI;
 using Vector2 = UnityEngine.Vector2;
+using UnityEngine.SceneManagement;
 
 public class UIManager
 {
@@ -25,6 +26,12 @@ public class UIManager
 
             return instance;
         }
+    }
+
+    public static IEnumerator LoadSceneDelayed(string sceneName, float delay = 0.2f)
+    {
+        yield return new WaitForSeconds(delay); // wait 0.2 seconds
+        SceneManager.LoadScene(sceneName);
     }
 
     public UIManager()
