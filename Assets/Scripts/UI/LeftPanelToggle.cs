@@ -24,7 +24,7 @@ public class LeftPanelToggle : MonoBehaviour
     private bool isExpanded = false;
     public float animationDuration = 0.2f;
 
-    private GameObject previewPart = null;
+    // private GameObject previewPart = null;
     private LDrawCamera ldrawCamera;
     private InputHandler inputHandler;
     private int selectedItem = 0;
@@ -42,20 +42,20 @@ public class LeftPanelToggle : MonoBehaviour
         screenSize = UIManager.GetScreenSize(canvasScaler);
     }
 
-    private void DestoryPreviewPart()
-    {
-        if (previewPart != null)
-        {
-            Destroy(previewPart);
-            previewPart = null;
-        }
-    }
+    // private void DestoryPreviewPart()
+    // {
+    //     if (previewPart != null)
+    //     {
+    //         Destroy(previewPart);
+    //         previewPart = null;
+    //     }
+    // }
 
     public void PreviewItem(string id, string desc, string colorName, GameObject previewPart)
     {
-        DestoryPreviewPart();
+        // DestoryPreviewPart();
 
-        this.previewPart = previewPart;
+        // this.previewPart = previewPart;
 
         Bounds bounds = previewPart.GetComponent<Renderer>().bounds;
         float radius = bounds.extents.magnitude;
@@ -72,6 +72,7 @@ public class LeftPanelToggle : MonoBehaviour
         if (selectedItem >= 0 && selectedItem < items.Count)
         {
             items[selectedItem].Deselect();
+            (items[selectedItem].Context as ItemContext).Go.SetActive(false);
         }
 
         selectedItem = index;
@@ -79,17 +80,17 @@ public class LeftPanelToggle : MonoBehaviour
         {
             items[selectedItem].Select();
             var context = items[selectedItem].Context as ItemContext;
-            GameObject clone = Instantiate(context.Go);
+            // GameObject clone = Instantiate(context.Go);
 
             int previewLayer = LayerMask.NameToLayer(Consts.PreviewLayerName);
-            clone.layer = previewLayer;
-            clone.SetActive(true);
+            context.Go.layer = previewLayer;
+            context.Go.SetActive(true);
 
             // Optional: reset local transforms
-            clone.transform.position = Vector3.zero;
-            clone.transform.rotation = Quaternion.identity;    
+            context.Go.transform.position = Vector3.zero;
+            context.Go.transform.rotation = Quaternion.identity;    
             
-            PreviewItem(context.PartId, context.Description, context.ColorName, clone);
+            PreviewItem(context.PartId, context.Description, context.ColorName, context.Go);
         }        
     }
 
@@ -109,7 +110,7 @@ public class LeftPanelToggle : MonoBehaviour
 
     public void Shrink(Action action)
     {
-        DestoryPreviewPart();
+        // DestoryPreviewPart();
 
         RectTransform rt = gridParent.GetComponent<RectTransform>();
         var right = rt.localPosition.x + rt.rect.width;
@@ -182,6 +183,11 @@ public class LeftPanelToggle : MonoBehaviour
 
     public void ClearGrid()
     {
+        foreach (var item in items)
+        {
+            Destroy((item.Context as ItemContext).Go);      
+        }
+
         items.Clear();
         foreach (Transform child in gridParent)
         {

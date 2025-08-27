@@ -77,6 +77,8 @@ namespace LDraw.Runtime
     {
         public string modelName;
         public List<LDrawStep> steps;
+
+        [System.NonSerialized]
         public ModelContainer container;
         public Dictionary<int /*removestep*/, LDrawBuildMod> buildMods;
     }   

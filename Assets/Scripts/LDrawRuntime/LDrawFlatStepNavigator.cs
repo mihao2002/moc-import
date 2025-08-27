@@ -101,7 +101,7 @@ namespace LDraw.Runtime
         private void ShowFlatStep(int flatStepIdx, bool animateStep = true)
         {
             // Hide all models
-            HideCurrentModel();
+            // HideCurrentModel();
 
             // Highlight the current step
             UpdateHighlight(flatStepIdx);

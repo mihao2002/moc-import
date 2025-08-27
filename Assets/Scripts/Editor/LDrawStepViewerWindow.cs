@@ -422,8 +422,14 @@ namespace LDraw.Editor
                     foreach (var go in objs)
                         go.SetActive(true);
 
-                    var stepGO = modelContainer.AddStep(objs);
-                    var bounds = LDrawUtils.CalculateBounds(stepGO);
+                    GameObject stepContainerGo = new GameObject();
+                    stepContainerGo.transform.SetParent(modelContainer.ModelContainerGo.transform, worldPositionStays: false);
+                    stepContainerGo.SetActive(false); // Hide by default
+                    objs.ForEach(so => so.transform.SetParent(stepContainerGo.transform, false));
+
+                    var stepContainer = new StepContainer(stepContainerGo);
+                    modelContainer.AddStep(stepContainer);
+                    var bounds = LDrawUtils.CalculateBounds(stepContainerGo);
                     if (!initialized)
                     {
                         modelBounds = bounds;
@@ -482,6 +488,7 @@ namespace LDraw.Editor
             {
                 OnProgressUpdate((i+1.0f)/previewCount, $"Creating preview for step {i+1}...");
                 yield return null;
+                previewNavigator.HideCurrentModel();
                 previewNavigator.GotoStep(i, false);
                 CreateStepImage(i, ldrawCamera, rt);
             }

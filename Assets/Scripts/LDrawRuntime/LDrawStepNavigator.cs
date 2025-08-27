@@ -79,6 +79,7 @@ namespace LDraw.Runtime
             stepSprites = LoadStepSprites();
 
             Load();
+            showParts = stepManager.GetStepParts(currentStep).Count > 0;
 
             PopulateSteps();
             UpdateStepText();
@@ -288,45 +289,12 @@ namespace LDraw.Runtime
             foreach (var modelData in models)
             {
                 var modelContainer = new ModelContainer(modelData.modelName);
-                foreach (var step in modelData.steps)
+                for (var i=0;i<modelData.steps.Count;i++)                
                 {
-                    var objs = new List<GameObject>();
-                    foreach (var part in step.parts)
-                    {
-                        var fileName = part.partId.Replace('\\', '_');
-                        GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{fileName}");
-                        if (prefab == null)
-                        {
-                            Debug.LogWarning($"Missing prefab for part: {part.partId}");
-                            continue;
-                        }
-                        GameObject go = Instantiate(prefab, parentContainer);
-                        go.transform.localPosition = part.position;
-                        go.transform.localRotation = part.rotation;
-                        if (!modelNames.Contains(part.partId))
-                        {
-                            // Regular part: ensure it has a renderer, assign material asset if found
-                            var renderer = go.GetComponent<Renderer>();
-                            if (renderer == null)
-                                renderer = go.AddComponent<MeshRenderer>();
-                            var color = colors[part.color].color;
-                            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
-                            var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
-
-                            Material[] sharedMats = renderer.sharedMaterials;
-                            for (var i = 0; i < sharedMats.Length; i++)
-                            {
-                                if (sharedMats[i] == mainMaterial)
-                                {
-                                    sharedMats[i] = mat;
-                                    renderer.sharedMaterials = sharedMats;
-                                    break;
-                                }
-                            }
-                        }
-                        objs.Add(go);
-                    }
-                    modelContainer.AddStep(objs);
+                    var step = modelData.steps[i];
+                    var stepContainer = new StepContainer(step, parentContainer, modelNames,
+                        colors, mainMaterial, modelContainer.ModelContainerGo, $"{modelData.modelName}_{i+1}");
+                    modelContainer.AddStep(stepContainer);
                 }
                 modelData.container = modelContainer;
             }

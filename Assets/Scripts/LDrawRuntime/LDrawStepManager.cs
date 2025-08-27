@@ -73,14 +73,7 @@ namespace LDraw.Runtime
             var model = models[flatStep.model];
             var modelContainer = model.container;
             var stepContainer = modelContainer.GetStepContainer(flatStep.modelStepIdx);
-            GameObject childGo = stepContainer.transform.GetChild(index)?.gameObject;
-            if (childGo == null)
-            {
-                Debug.LogError($"Failed to get object {index}");
-                return null;
-            }
-
-            return childGo;
+            return stepContainer.ClonePart(index);
         }
 
         public int GetModel(int step)
