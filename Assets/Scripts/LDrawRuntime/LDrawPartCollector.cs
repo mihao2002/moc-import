@@ -13,6 +13,7 @@ using UnityEngine.Rendering;
 using System.Xml;
 using System.Xml.Linq;
 using UnityEngine.AI;
+using System.Runtime.InteropServices;
 
 namespace LDraw.Runtime
 {
@@ -406,6 +407,9 @@ namespace LDraw.Runtime
             return new XDocument(root);
         }
 
+        [DllImport("__Internal")]
+        private static extern void _ShowShareSheet(string filePath);
+
         public void SaveOrder()
         {
             string folder = Application.persistentDataPath;
@@ -433,6 +437,10 @@ namespace LDraw.Runtime
 
             Debug.Log("Saved at: " + path);
             orderPane.SetActive(false);
+
+#if UNITY_IOS && !UNITY_EDITOR
+            _ShowShareSheet(path);
+#endif
         }
 
         private void Load()
