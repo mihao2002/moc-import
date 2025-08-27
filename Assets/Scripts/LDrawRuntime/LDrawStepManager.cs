@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace LDraw.Runtime
@@ -24,7 +25,7 @@ namespace LDraw.Runtime
             }
         }
 
-        public Dictionary<LDrawPartCore, int> GetStepParts(int step)
+        public Dictionary<LDrawPartCore, (int, int) /*count, index*/> GetStepParts(int step)
         {
             var flatStep = flatSteps[step];
             var model = models[flatStep.model];
@@ -33,6 +34,8 @@ namespace LDraw.Runtime
             var parts = modelSteps[stepIdx].parts;
 
             var results = new Dictionary<LDrawPartCore, int>();
+            var partIndexes = new Dictionary<LDrawPartCore, int>();
+            var totalCount = 0;
             foreach (var part in parts)
             {
                 if (results.ContainsKey(part))
@@ -42,7 +45,10 @@ namespace LDraw.Runtime
                 else
                 {
                     results[part] = 1;
+                    partIndexes[part] = totalCount;
                 }
+
+                totalCount++;
             }
 
             var buildMods = model.buildMods;
@@ -64,7 +70,13 @@ namespace LDraw.Runtime
                 }
             }
 
-            return results;
+            var newResults = new Dictionary<LDrawPartCore, (int, int)>();
+            foreach (var kvp in results)
+            {
+                newResults.Add(kvp.Key, (kvp.Value, partIndexes[kvp.Key]));
+            }
+
+            return newResults;
         }
 
         public GameObject GetPartFromStep(int step, int index)

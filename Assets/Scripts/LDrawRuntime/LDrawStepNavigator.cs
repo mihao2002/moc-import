@@ -185,10 +185,10 @@ namespace LDraw.Runtime
                         description = desc.description;
                     }
 
-                    var go = stepManager.GetPartFromStep(currentStep, idx);
+                    var go = stepManager.GetPartFromStep(currentStep, kvp.Value.Item2);
                     var context = new LeftPanelToggle.ItemContext(go, id, description, colorName);
 
-                    partInfo[sprite] = (kvp.Value.ToString(), context);
+                    partInfo[sprite] = (kvp.Value.Item1.ToString(), context);
                 }
                 else
                 {
