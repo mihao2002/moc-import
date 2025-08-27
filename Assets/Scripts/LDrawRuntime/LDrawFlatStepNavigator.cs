@@ -120,8 +120,8 @@ namespace LDraw.Runtime
                 modelContainer.ShowStep(i, true);
             }
 
-            // Hide steps after stepIdx
-            for (int i = stepIdx + 1; i < modelSteps.Count; i++)
+            // Hide steps from stepIdx
+            for (int i = stepIdx; i < modelSteps.Count; i++)
             {
                 modelContainer.ShowStep(i, false);
             }
