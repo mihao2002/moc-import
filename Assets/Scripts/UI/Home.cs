@@ -14,7 +14,7 @@ public class Home : MonoBehaviour
         if (PlayerPrefs.HasKey("CollectProgress"))
         {
             float progress = PlayerPrefs.GetFloat("CollectProgress");
-            buildProgressText.text += $"{Math.Floor(progress * 100)}% parts collected. ";
+            buildProgressText.text += $"{Math.Floor(progress * 100)}% parts are collected. ";
         }
 
         if (PlayerPrefs.HasKey("BuildProgress"))
