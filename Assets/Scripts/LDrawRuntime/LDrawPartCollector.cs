@@ -14,6 +14,7 @@ using System.Xml;
 using System.Xml.Linq;
 using UnityEngine.AI;
 using System.Runtime.InteropServices;
+using Sych.ShareAssets.Runtime;
 
 namespace LDraw.Runtime
 {
@@ -407,12 +408,15 @@ namespace LDraw.Runtime
             return new XDocument(root);
         }
 
+#if UNITY_IOS
         [DllImport("__Internal")]
         private static extern void _ShowShareSheet(string filePath);
+#endif
 
         public void SaveOrder()
         {
             string folder = Application.persistentDataPath;
+
             var baseName = fileName.text;
             var extension = ".xml";
             if (baseName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
@@ -440,6 +444,9 @@ namespace LDraw.Runtime
 
 #if UNITY_IOS && !UNITY_EDITOR
             _ShowShareSheet(path);
+#elif UNITY_ANDROID && !UNITY_EDITOR
+            var items = new List<string>{path};
+            Share.Items(items, success => {});
 #endif
         }
 

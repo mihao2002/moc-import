@@ -1,3 +1,4 @@
+#ifdef __APPLE__  // Only compile for iOS/macOS
 #import <UIKit/UIKit.h>
 
 extern "C" {
@@ -12,3 +13,4 @@ extern "C" {
         [rootVC presentViewController:activityVC animated:YES completion:nil];
     }
 }
+#endif
