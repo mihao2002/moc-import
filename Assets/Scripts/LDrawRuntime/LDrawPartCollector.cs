@@ -369,7 +369,7 @@ namespace LDraw.Runtime
         public void Order()
         {
             orderPane.SetActive(true);
-            orderDescription.text = $"You have owned {totalCollectedCount} parts.\nThis will create an XML file of {totalCount - totalCollectedCount} missing parts for bricklink.com wanted list creation.";
+            orderDescription.text = $"You have {totalCollectedCount} parts.\nA file having {totalCount - totalCollectedCount} missing parts will be created for bricklink.com wanted list.";
             fileName.text = "partlist.xml";            
         }
 
