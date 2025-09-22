@@ -65,8 +65,7 @@ namespace LDraw.Runtime
             var flatSteps = data.flatSteps;
 
             var color = colors[16].color;
-            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
-            mainMaterial = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+            mainMaterial = LDrawUtlity.LoadMaterial(color);
 
             PreInstantiateAllParts(models, colors); // Runtime-specific: instantiate from prefabs
 

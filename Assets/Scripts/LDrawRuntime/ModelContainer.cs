@@ -135,7 +135,7 @@ namespace LDraw.Runtime
             {
                 var part = step.parts[i];
                 var fileName = part.partId.Replace('\\', '_');
-                GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{fileName}");
+                GameObject prefab = LDrawUtlity.LoadPrefab(fileName);
                 if (prefab == null)
                 {
                     Debug.LogWarning($"Missing prefab for part: {part.partId}");
@@ -152,13 +152,12 @@ namespace LDraw.Runtime
                     if (renderer == null)
                         renderer = go.AddComponent<MeshRenderer>();
                     var color = colors[part.color].color;
-                    string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
-                    var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+                    var mat = LDrawUtlity.LoadMaterial(color);
 
                     Material[] sharedMats = renderer.sharedMaterials;
                     for (var j = 0; j < sharedMats.Length; j++)
                     {
-                        if (sharedMats[j] == mainMaterial)
+                        if (sharedMats[j].color == mainMaterial.color)
                         {
                             sharedMats[j] = mat;
                             renderer.sharedMaterials = sharedMats;

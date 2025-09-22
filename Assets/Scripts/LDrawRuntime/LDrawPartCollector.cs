@@ -15,6 +15,7 @@ using System.Xml.Linq;
 using UnityEngine.AI;
 using System.Runtime.InteropServices;
 using Sych.ShareAssets.Runtime;
+using UnityEditor.Playables;
 
 namespace LDraw.Runtime
 {
@@ -100,8 +101,7 @@ namespace LDraw.Runtime
             colors = JsonConvert.DeserializeObject<Dictionary<int, LDrawColor>>(jsonAsset3.text);
 
             var color = colors[16].color;
-            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
-            mainMaterial = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+            mainMaterial = LDrawUtlity.LoadMaterial(color);
             partObjects = new List<GameObject>();
             currentPart = -1;
             showCollected = false;
@@ -208,7 +208,7 @@ namespace LDraw.Runtime
             {
                 var part = partCount.part;
                 var fileName = part.partId.Replace('\\', '_');
-                GameObject prefab = Resources.Load<GameObject>($"LDrawPrefabs/{fileName}");
+                GameObject prefab = LDrawUtlity.LoadPrefab(fileName);
                 if (prefab == null)
                 {
                     Debug.LogWarning($"Missing prefab for part: {part.partId}");
@@ -221,13 +221,12 @@ namespace LDraw.Runtime
                 if (renderer == null)
                     renderer = go.AddComponent<MeshRenderer>();
                 var color = colors[part.color].color;
-                string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
-                var mat = Resources.Load<Material>($"LDrawMaterials/{colorKey}");
+                var mat = LDrawUtlity.LoadMaterial(color);
 
                 Material[] sharedMats = renderer.sharedMaterials;
                 for (var i = 0; i < sharedMats.Length; i++)
                 {
-                    if (sharedMats[i] == mainMaterial)
+                    if (sharedMats[i].color == mainMaterial.color)
                     {
                         sharedMats[i] = mat;
                         renderer.sharedMaterials = sharedMats;

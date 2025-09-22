@@ -7,6 +7,8 @@ using LDraw.Runtime;
 using System.Linq;
 using Unity.Collections;
 using UnityEngine.Rendering;
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 
 namespace LDraw.Editor
 {
@@ -39,17 +41,47 @@ namespace LDraw.Editor
             Repaint(); // Let UI refresh
         }
 
+        public static void ClearAllAddressables()
+        {
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (settings == null)
+            {
+                UnityEngine.Debug.LogWarning("AddressableAssetSettings not found.");
+                return;
+            }
+
+            foreach (var group in settings.groups)
+            {
+                // Skip built-in group like "Built In Data" if you want
+                if (group.ReadOnly) continue;
+
+                // Remove all entries
+                var entries = group.entries.ToList();
+                for (int i = entries.Count - 1; i >= 0; i--)
+                {
+                    var entry = entries[i];
+                    settings.RemoveAssetEntry(entry.guid);
+                }
+            }
+
+            settings.SetDirty(AddressableAssetSettings.ModificationEvent.BatchModification, null, true);
+            AssetDatabase.SaveAssets();
+            UnityEngine.Debug.Log("All Addressables cleared.");
+        }
+
         // Delete all generated resource files and folders (prefabs, materials, red material asset, and their .meta files)
         private static void CleanUpResourceFiles()
         {
+            ClearAllAddressables();
             string[] targets = {
-                "Assets/Resources/LDrawPrefabs",
-                "Assets/Resources/LDrawMeshes",
-                "Assets/Resources/LDrawMaterials",
+                "Assets/Resources_moved/LDrawPrefabs",
+                "Assets/Resources_moved/LDrawMeshes",
+                "Assets/Resources_moved/LDrawMaterials",
                 "Assets/Resources/LDrawImages",
                 "Assets/Resources/LDrawStepImages",
-                "Assets/Resources/LDrawPrefabs.meta",
-                "Assets/Resources/LDrawMaterials.meta",
+                "Assets/Resources_moved/LDrawPrefabs.meta",
+                "Assets/Resources_moved/LDrawMaterials.meta",
+                "Assets/Resources_moved/LDrawMeshes.meta",
                 "Assets/Resources/LDrawImages.meta",
                 "Assets/Resources/LDrawStepImages.meta",
             };

@@ -7,6 +7,8 @@ using System.Text.RegularExpressions;
 using LDraw.Runtime;
 using UnityEngine.Rendering;
 using Newtonsoft.Json;
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 
 namespace LDraw.Editor
 {
@@ -65,22 +67,19 @@ namespace LDraw.Editor
 
         public Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
-            string meshFolder = "Assets/Resources/LDrawMeshes";
+            string meshFolder = "Assets/Resources_moved/LDrawMeshes";
             if (!Directory.Exists(meshFolder))
             {
                 Directory.CreateDirectory(meshFolder);
                 AssetDatabase.Refresh();
             }
 
-            var fileName = meshName.Replace('\\', '_');
+            string fileName = meshName.Replace('\\', '_');
             string meshAssetPath = Path.Combine(meshFolder, fileName + ".asset");
 
-            // Check if mesh asset already exists to avoid overwriting
+            // Check if mesh asset already exists
             Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshAssetPath);
-            if (existingMesh != null)
-            {
-                return existingMesh; // reuse existing asset
-            }
+            if (existingMesh != null) return existingMesh;
 
             // Create new mesh asset
             Mesh newMesh = UnityEngine.Object.Instantiate(mesh);
@@ -89,12 +88,32 @@ namespace LDraw.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
+            // --- Add to Addressables default group ---
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (settings != null)
+            {
+                string guid = AssetDatabase.AssetPathToGUID(meshAssetPath);
+                var entry = settings.FindAssetEntry(guid);
+                if (entry == null)
+                {
+                    var defaultGroup = settings.DefaultGroup;
+                    entry = settings.CreateOrMoveEntry(guid, defaultGroup);
+                }
+
+                // Set a simple address
+                entry.address = $"LDrawMeshes/{fileName}";
+            }
+            else
+            {
+                Debug.LogWarning("AddressableAssetSettings not found. Make sure Addressables package is installed.");
+            }
+
             return newMesh;
         }
 
         public Material GetOrCreateMaterial(int colorIdx)
         {
-            string materialFolder = "Assets/Resources/LDrawMaterials";
+            string materialFolder = "Assets/Resources_moved/LDrawMaterials";
             if (!Directory.Exists(materialFolder))
                 Directory.CreateDirectory(materialFolder);
 
@@ -107,17 +126,36 @@ namespace LDraw.Editor
             if (existing != null) return existing;
 
             // Use URP Lit shader instead of Standard
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null)
-            {
-                Debug.LogError("URP Lit shader not found. Make sure URP is installed and set up.");
-                shader = Shader.Find("Standard"); // fallback
-            }
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var mat = new Material(shader) { color = color };
 
-            var mat = new Material(shader);
-            mat.color = color;
             AssetDatabase.CreateAsset(mat, matPath);
             AssetDatabase.SaveAssets();
+
+            // --- Add to default Addressables group with custom address ---
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (settings != null)
+            {
+                var guid = AssetDatabase.AssetPathToGUID(matPath);
+                var entry = settings.FindAssetEntry(guid);
+                if (entry == null)
+                {
+                    var defaultGroup = settings.DefaultGroup;
+                    entry = settings.CreateOrMoveEntry(guid, defaultGroup);
+                }
+                else
+                {
+                    Debug.LogWarning("entry !== null");
+                }
+
+                // Set custom address
+                    entry.address = $"LDrawMaterials/Mat_{colorKey}";
+            }
+            else
+            {
+                Debug.LogWarning("AddressableAssetSettings not found. Make sure Addressables package is installed.");
+            }
+
             return mat;
         }
 
@@ -935,13 +973,7 @@ namespace LDraw.Editor
                 Mesh meshAsset = SaveMeshAsset(mf.sharedMesh, partId);
                 mf.sharedMesh = meshAsset;
 
-                string prefabFolder = "Assets/Resources/LDrawPrefabs";
-                if (!Directory.Exists(prefabFolder))
-                    Directory.CreateDirectory(prefabFolder);
-
-                var fileName = partId.Replace('\\', '_');
-                string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
-                PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+                SaveObjectToPrefab(partId, go);
 
                 go.SetActive(false);
             }
@@ -1155,6 +1187,16 @@ namespace LDraw.Editor
             go.AddComponent<MeshFilter>().sharedMesh = meshAsset;
             go.AddComponent<MeshRenderer>().sharedMaterials = materialList.ToArray();
 
+            SaveObjectToPrefab(partId, go);
+
+            go.SetActive(false);
+            submodelCache[partId] = go;
+
+            return go;
+        }
+
+        private void SaveObjectToPrefab_old(string partId, GameObject go)
+        {
             string prefabFolder = "Assets/Resources/LDrawPrefabs";
             if (!Directory.Exists(prefabFolder))
                 Directory.CreateDirectory(prefabFolder);
@@ -1162,11 +1204,46 @@ namespace LDraw.Editor
             var fileName = partId.Replace('\\', '_');
             string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
             PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+        }
 
-            go.SetActive(false);
-            submodelCache[partId] = go;
+        private void SaveObjectToPrefab(string partId, GameObject go)
+        {
+            string prefabFolder = "Assets/Resources_moved/LDrawPrefabs"; // keep consistent with new Addressables location
+            if (!Directory.Exists(prefabFolder))
+                Directory.CreateDirectory(prefabFolder);
 
-            return go;
+            var fileName = partId.Replace('\\', '_');
+            string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
+
+            // Save prefab asset
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+
+            // Make it Addressable
+            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
+            if (settings != null)
+            {
+                // Choose default group (or create one)
+                AddressableAssetGroup group = settings.DefaultGroup;
+
+                // Convert path to GUID
+                string guid = AssetDatabase.AssetPathToGUID(prefabPath);
+
+                // Check if already exists
+                var entry = settings.FindAssetEntry(guid);
+                if (entry == null)
+                {
+                    entry = settings.CreateOrMoveEntry(guid, group);
+                    entry.address = $"LDrawPrefabs/{fileName}"; // cleaner address
+                    Debug.Log($"Added prefab to Addressables: {entry.address}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("Addressable settings not found — prefab saved but not marked Addressable.");
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
         }
 
         private static bool MatrixIsMirrored(Matrix4x4 m)
