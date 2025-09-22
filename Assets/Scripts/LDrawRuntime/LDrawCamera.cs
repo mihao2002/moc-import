@@ -101,10 +101,10 @@ namespace LDraw.Runtime
             float horizontalFOV = 2f * Mathf.Atan(Mathf.Tan(verticalFOV / 2f) * aspect);
 
             // Distance required to fit the sphere inside vertical FOV
-            float distanceV = radius / Mathf.Sin(verticalFOV / 2f);
+            float distanceV = radius / Mathf.Tan(verticalFOV / 2f);
 
             // Distance required to fit the sphere inside horizontal FOV
-            float distanceH = radius / Mathf.Sin(horizontalFOV / 2f);
+            float distanceH = radius / Mathf.Tan(horizontalFOV / 2f);
 
             // Use the larger one to ensure full fit
             float distance = Mathf.Max(distanceV, distanceH);
