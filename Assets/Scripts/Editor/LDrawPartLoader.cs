@@ -137,6 +137,13 @@ namespace LDraw.Editor
                     {
                         // If the group doesn't exist, create it
                         group = settings.CreateGroup(groupName, false, false, false, null, typeof(BundledAssetGroupSchema));
+                        var schema = group.GetSchema<BundledAssetGroupSchema>();
+                        if (schema != null)
+                        {
+                            schema.BuildPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteBuildPath);
+                            schema.LoadPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteLoadPath);
+                            schema.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
+                        }
                     }
 
                     entry = settings.CreateOrMoveEntry(guid, group);
