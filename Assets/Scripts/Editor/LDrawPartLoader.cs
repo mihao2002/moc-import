@@ -32,12 +32,15 @@ namespace LDraw.Editor
         private int mainColorIndex = 16;
 
         public string mainModelName = "main.ldr";
-        // public Dictionary<string, (string, string)> partModels = new Dictionary<string, (string, string)>();
+        private int meshSuffix = 0;
+        private long meshSize = 0;
+        private long maxMeshSize;
 
 
-        public LDrawPartLoader(Dictionary<int, LDrawColor> colors)
+        public LDrawPartLoader(Dictionary<int, LDrawColor> colors, long maxMeshSize)
         {
             this.colors = colors;
+            this.maxMeshSize = maxMeshSize;
             usedColors = new HashSet<int>();
             partDescriptions = new Dictionary<string, LDrawPartDesc>();
             mainMaterial = GetOrCreateMaterial(mainColorIndex);
@@ -90,7 +93,15 @@ namespace LDraw.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            AddToAddressableGroup(meshAssetPath, "Meshes", $"LDrawMeshes/{fileName}");
+            var size = EstimateMeshSize(newMesh);
+            meshSize += size;
+            if (meshSize > maxMeshSize)
+            {
+                meshSuffix += 1;
+                meshSize = 0;
+            }
+
+            AddToAddressableGroup(meshAssetPath, $"Meshes_{meshSuffix}", $"LDrawMeshes/{fileName}");
 
             return newMesh;
         }
@@ -142,7 +153,7 @@ namespace LDraw.Editor
                         {
                             schema.BuildPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteBuildPath);
                             schema.LoadPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteLoadPath);
-                            schema.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
+                            // schema.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
                         }
                     }
 
@@ -1198,15 +1209,27 @@ namespace LDraw.Editor
             return go;
         }
 
-        private void SaveObjectToPrefab_old(string partId, GameObject go)
+        public static long EstimateMeshSize(Mesh mesh)
         {
-            string prefabFolder = "Assets/Resources/LDrawPrefabs";
-            if (!Directory.Exists(prefabFolder))
-                Directory.CreateDirectory(prefabFolder);
+            if (mesh == null) return 0;
 
-            var fileName = partId.Replace('\\', '_');
-            string prefabPath = Path.Combine(prefabFolder, $"{fileName}.prefab");
-            PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            int vertexCount = mesh.vertexCount;
+            int triangleCount = mesh.triangles.Length / 3;
+
+            // Vertex stride: assume positions (12) + normals (12) + UVs (8)
+            int stride = 12; // position
+            if (mesh.normals != null && mesh.normals.Length == vertexCount) stride += 12;
+            if (mesh.uv != null && mesh.uv.Length == vertexCount) stride += 8;
+
+            // Vertex buffer size
+            long vertexBufferSize = (long)vertexCount * stride;
+
+            // Index buffer size (16-bit if < 65k verts, otherwise 32-bit)
+            bool use32Bit = vertexCount > 65535;
+            int indexSize = use32Bit ? 4 : 2;
+            long indexBufferSize = (long)mesh.triangles.Length * indexSize;
+
+            return vertexBufferSize + indexBufferSize;
         }
 
         private void SaveObjectToPrefab(string partId, GameObject go)

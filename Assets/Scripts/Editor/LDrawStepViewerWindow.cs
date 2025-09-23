@@ -69,10 +69,38 @@ namespace LDraw.Editor
             UnityEngine.Debug.Log("All Addressables cleared.");
         }
 
+        public static void DeleteNonDefaultGroups()
+        {
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (settings == null)
+            {
+                UnityEngine.Debug.LogWarning("AddressableAssetSettings not found.");
+                return;
+            }
+
+            // Find the default group
+            var defaultGroup = settings.DefaultGroup;
+
+            // Collect all groups that are not default and not read-only
+            var groupsToRemove = settings.groups
+                .Where(g => g != null && g != defaultGroup && !g.ReadOnly)
+                .ToList();
+
+            foreach (var group in groupsToRemove)
+            {
+                settings.RemoveGroup(group);
+            }
+
+            settings.SetDirty(AddressableAssetSettings.ModificationEvent.BatchModification, null, true);
+            AssetDatabase.SaveAssets();
+
+            UnityEngine.Debug.Log($"Deleted {groupsToRemove.Count} non-default Addressable groups.");
+        }
+
         // Delete all generated resource files and folders (prefabs, materials, red material asset, and their .meta files)
         private static void CleanUpResourceFiles()
         {
-            ClearAllAddressables();
+            DeleteNonDefaultGroups();
             string[] targets = {
                 "Assets/Resources_moved/LDrawPrefabs",
                 "Assets/Resources_moved/LDrawMeshes",
@@ -201,7 +229,8 @@ namespace LDraw.Editor
             string ldconfigPath = Path.Combine(partLibraryPath, "LDConfig.ldr");
             string studioColorPath = Path.Combine(studioDataPath, "StudioColorDefinition.txt");
             var colors = LDrawColorManager.LoadFromFile(ldconfigPath, studioColorPath);
-            var partLoader = new LDrawPartLoader(colors);
+            // Set the max mesh size is 100M
+            var partLoader = new LDrawPartLoader(colors, 1024*1024*100);
 
             OnProgressUpdate(0f, "Clearing cache...");
             yield return null;
