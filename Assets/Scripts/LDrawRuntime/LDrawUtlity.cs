@@ -12,6 +12,9 @@ namespace LDraw.Runtime
             string address = $"LDrawMaterials/{colorKey}";
             var handle = Addressables.LoadAssetAsync<Material>(address);
             Material mat = handle.WaitForCompletion();
+            // By default, the shader link is broken from remote asset.
+            // Relink the shader to local shader here.
+            mat.shader = Shader.Find(mat.shader.name);
             return mat;
         }
 

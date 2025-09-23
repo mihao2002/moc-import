@@ -9,6 +9,8 @@ using UnityEngine.Rendering;
 using Newtonsoft.Json;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.AddressableAssets.Settings.GroupSchemas;
+using System.Linq;
 
 namespace LDraw.Editor
 {
@@ -88,25 +90,7 @@ namespace LDraw.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            // --- Add to Addressables default group ---
-            var settings = AddressableAssetSettingsDefaultObject.Settings;
-            if (settings != null)
-            {
-                string guid = AssetDatabase.AssetPathToGUID(meshAssetPath);
-                var entry = settings.FindAssetEntry(guid);
-                if (entry == null)
-                {
-                    var defaultGroup = settings.DefaultGroup;
-                    entry = settings.CreateOrMoveEntry(guid, defaultGroup);
-                }
-
-                // Set a simple address
-                entry.address = $"LDrawMeshes/{fileName}";
-            }
-            else
-            {
-                Debug.LogWarning("AddressableAssetSettings not found. Make sure Addressables package is installed.");
-            }
+            AddToAddressableGroup(meshAssetPath, "Meshes", $"LDrawMeshes/{fileName}");
 
             return newMesh;
         }
@@ -132,16 +116,30 @@ namespace LDraw.Editor
             AssetDatabase.CreateAsset(mat, matPath);
             AssetDatabase.SaveAssets();
 
+            AddToAddressableGroup(matPath, "Materials", $"LDrawMaterials/Mat_{colorKey}");
+
+            return mat;
+        }
+
+        private void AddToAddressableGroup(string path, string groupName, string address)
+        {
             // --- Add to default Addressables group with custom address ---
             var settings = AddressableAssetSettingsDefaultObject.Settings;
             if (settings != null)
             {
-                var guid = AssetDatabase.AssetPathToGUID(matPath);
+                var guid = AssetDatabase.AssetPathToGUID(path);
                 var entry = settings.FindAssetEntry(guid);
                 if (entry == null)
                 {
-                    var defaultGroup = settings.DefaultGroup;
-                    entry = settings.CreateOrMoveEntry(guid, defaultGroup);
+                    // Try to find a group called "Materials"
+                    var group = settings.groups.FirstOrDefault(g => g.Name == groupName);
+                    if (group == null)
+                    {
+                        // If the group doesn't exist, create it
+                        group = settings.CreateGroup(groupName, false, false, false, null, typeof(BundledAssetGroupSchema));
+                    }
+
+                    entry = settings.CreateOrMoveEntry(guid, group);
                 }
                 else
                 {
@@ -149,14 +147,12 @@ namespace LDraw.Editor
                 }
 
                 // Set custom address
-                    entry.address = $"LDrawMaterials/Mat_{colorKey}";
+                entry.address = address;
             }
             else
             {
                 Debug.LogWarning("AddressableAssetSettings not found. Make sure Addressables package is installed.");
             }
-
-            return mat;
         }
 
         public GameObject GetGameObject(string partId, int color)
@@ -1218,32 +1214,10 @@ namespace LDraw.Editor
             // Save prefab asset
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
 
-            // Make it Addressable
-            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
-            if (settings != null)
-            {
-                // Choose default group (or create one)
-                AddressableAssetGroup group = settings.DefaultGroup;
-
-                // Convert path to GUID
-                string guid = AssetDatabase.AssetPathToGUID(prefabPath);
-
-                // Check if already exists
-                var entry = settings.FindAssetEntry(guid);
-                if (entry == null)
-                {
-                    entry = settings.CreateOrMoveEntry(guid, group);
-                    entry.address = $"LDrawPrefabs/{fileName}"; // cleaner address
-                    Debug.Log($"Added prefab to Addressables: {entry.address}");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("Addressable settings not found — prefab saved but not marked Addressable.");
-            }
-
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+
+            AddToAddressableGroup(prefabPath, "Prefabs", $"LDrawPrefabs/{fileName}");
         }
 
         private static bool MatrixIsMirrored(Matrix4x4 m)
