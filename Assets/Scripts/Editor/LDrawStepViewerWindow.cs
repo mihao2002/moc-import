@@ -660,8 +660,6 @@ namespace LDraw.Editor
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.SaveAndReimport();
-
-            Debug.Log("Saved and imported: " + fullPath);
         }
 
         private static Texture2D RenderCamera(LDrawCamera camera, RenderTexture rt, int resolution = 512)

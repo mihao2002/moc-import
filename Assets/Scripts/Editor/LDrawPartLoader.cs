@@ -166,6 +166,12 @@ namespace LDraw.Editor
 
                 // Set custom address
                 entry.address = address;
+
+                // --- Add the "All" label ---
+                if (!entry.labels.Contains("All"))
+                {
+                    entry.labels.Add("All");
+                }
             }
             else
             {

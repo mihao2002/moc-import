@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 468a46d0ae32c3544b7d98094e6448a9, type: 3}
   m_Name: AddressableAssetSettings
   m_EditorClassIdentifier: 
-  m_DefaultGroup: f149f5ffccb4fe74ebbc5ee561c87f99
+  m_DefaultGroup: 05d28cff7b3865e46ac6430987ec534e
   m_currentHash:
     serializedVersion: 2
     Hash: 00000000000000000000000000000000
@@ -59,9 +59,15 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
+  - {fileID: 11400000, guid: e2c63d9ea02fbf04bad7de754eb3ad11, type: 2}
+  - {fileID: 11400000, guid: 36f856448594c16498884abc200f927d, type: 2}
+  - {fileID: 11400000, guid: 2d40b360d3636c241bcf7e20912a457e, type: 2}
   - {fileID: 11400000, guid: 57264f5def7316643828236b15d28ca1, type: 2}
-  - {fileID: 11400000, guid: 11192cc83060b2d4a9cecc38750a7392, type: 2}
+  - {fileID: 11400000, guid: 23b2f33cee9ce284a9ee41d0ad8fa66c, type: 2}
+  - {fileID: 11400000, guid: 71d567227e308d34f88514aa46e90121, type: 2}
   - {fileID: 11400000, guid: cd97a1231d43e164f83a59b0b7fc3120, type: 2}
+  - {fileID: 11400000, guid: 0b6973b17cff49d48adaa7c6e41c3632, type: 2}
+  - {fileID: 11400000, guid: 0747965814ee3c84cad7ce21ee592f46, type: 2}
   m_BuildSettings:
     m_LogResourceManagerExceptions: 1
     m_BundleBuildPath: Temp/com.unity.addressables/AssetBundles
@@ -101,6 +107,7 @@ MonoBehaviour:
   m_LabelTable:
     m_LabelNames:
     - default
+    - All
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: ea0c4009545e1e84eadc3a35212e7927, type: 2}
