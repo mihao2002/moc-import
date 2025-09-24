@@ -8,5 +8,6 @@ Builds/
 .vs/
 Assets/Resources/
 Assets/Resources_moved/
+Assets/AddressableAssetsData/
 .utmp/
 ServerData/
