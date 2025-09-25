@@ -1,0 +1,117 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Meshes_2
+  m_EditorClassIdentifier: 
+  m_GroupName: Meshes_2
+  m_GUID: 80abf0528102920489acf36cb35ff580
+  m_SerializeEntries:
+  - m_GUID: 003d73eb959053a45a0614b920d8a1b8
+    m_Address: LDrawMeshes/-temp30.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c7eec5765ed94d4fa3fb26baba4383f
+    m_Address: LDrawMeshes/-wingleft.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1f259ea65d597074ebe35b952bf9b451
+    m_Address: LDrawMeshes/-rofbackright.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 235f1f4614f9cea409f4680af7a5aeac
+    m_Address: LDrawMeshes/-roofright.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 239324586ff9b0a459686dbc95a964b7
+    m_Address: LDrawMeshes/-temp29.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 37b95528fcf65c641be6d94cefa864b1
+    m_Address: LDrawMeshes/-hoodbackright.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 393ab2ce10cd6d74699b34f8101f429e
+    m_Address: LDrawMeshes/-hoodbackleft.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 55bff13bda96ef845821214e87bfd197
+    m_Address: LDrawMeshes/-roofleft.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5735924245b25284782ad56b6698c202
+    m_Address: LDrawMeshes/-wing.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5fbb4cd9111bb7a40aa075da5517f72f
+    m_Address: LDrawMeshes/-roofbackleft.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 85694c0c01148b24db66d3c5167c2809
+    m_Address: LDrawMeshes/-roof.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 933cf597313d04a4c83c7f22d9035035
+    m_Address: LDrawMeshes/-bumperback.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a5ee0c8a20f932b46844c4bf13c2122f
+    m_Address: LDrawMeshes/-taillightright.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c803c3236225d734e93e444a67219f59
+    m_Address: LDrawMeshes/-temp28.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d72e16d704d085f4fb501f25f1db841d
+    m_Address: LDrawMeshes/-wingright.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fe2f8ed82ed36a84699899ab93f7ba46
+    m_Address: LDrawMeshes/-temp27.ldr
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - All
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 29358713b33c9a248a16c0ec1cf79ba8, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 091b4bddd56fe534c841cd10d089fec7, type: 2}
