@@ -23,7 +23,22 @@ public class Home : MonoBehaviour
     {
         // 1. Get all resource locations (all Addressable assets)
         AsyncOperationHandle<IList<IResourceLocation>> locationsHandle = Addressables.LoadResourceLocationsAsync("All");
-        IList<IResourceLocation> allLocations = await locationsHandle.Task;
+        await locationsHandle.Task;
+
+        if (locationsHandle.Status != AsyncOperationStatus.Succeeded)
+        {
+            Debug.LogError($"Failed to load resource locations: {locationsHandle.OperationException}");
+            return;
+        }
+
+        IList<IResourceLocation> allLocations = locationsHandle.Result;
+        Debug.Log($"Loaded {allLocations.Count} resource locations:");
+
+        // Log each location
+        foreach (var loc in allLocations)
+        {
+            Debug.Log($"Address: {loc.InternalId} | Primary Key: {loc.PrimaryKey} | Resource Type: {loc.ResourceType}");
+        }
 
         // 2. Optional: check total download size
         long totalSize = await Addressables.GetDownloadSizeAsync(allLocations).Task;
