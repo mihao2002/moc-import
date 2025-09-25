@@ -78,7 +78,7 @@ MonoBehaviour:
       m_ProfileName: Default
       m_Values:
       - m_Id: 1f5dd6cf9176dfc48b95422ffce21c0e
-        m_Value: https://raw.githubusercontent.com/mihao2002/publicassets/main/BeeBuild/AssetBundles
+        m_Value: 'https://raw.githubusercontent.com/mihao2002/publicassets/main/BeeBuild/AssetBundles/[Platform]'
       - m_Id: 69a4ed28273e7c74187282e868e15f28
         m_Value: '{UnityEngine.AddressableAssets.Addressables.RuntimePath}/[BuildTarget]'
       - m_Id: 71bd378e2e069464594143a64cd545fe
