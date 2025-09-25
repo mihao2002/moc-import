@@ -1,3 +1,4 @@
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -8,7 +9,8 @@ namespace LDraw.Runtime
     {
         public static Material LoadMaterial(Color color)
         {
-            string colorKey = $"Mat_{color.r:F3}_{color.g:F3}_{color.b:F3}";
+            string colorKey = string.Format(CultureInfo.InvariantCulture, "Mat_{0:F3}_{1:F3}_{2:F3}",
+                color.r, color.g, color.b);
             string address = $"LDrawMaterials/{colorKey}";
             var handle = Addressables.LoadAssetAsync<Material>(address);
             Material mat = handle.WaitForCompletion();

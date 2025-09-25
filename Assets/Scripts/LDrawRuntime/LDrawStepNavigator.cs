@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System.Linq;
 using System.IO;
 using UnityEngine.SceneManagement;
+using System.Globalization;
 
 namespace LDraw.Runtime
 {
@@ -169,7 +170,8 @@ namespace LDraw.Runtime
                     var color = colors[part.color];
                     colorName = color.name;
                     id = Path.GetFileNameWithoutExtension(part.partId);
-                    spriteKey = $"Mat_{color.color.r:F3}_{color.color.g:F3}_{color.color.b:F3}_{spriteKey}";
+                    spriteKey = string.Format(CultureInfo.InvariantCulture, "Mat_{0:F3}_{1:F3}_{2:F3}_{3}",
+                        color.color.r, color.color.g, color.color.b, spriteKey);
                 }
 
                 if (partSpriteDict.ContainsKey(spriteKey))
