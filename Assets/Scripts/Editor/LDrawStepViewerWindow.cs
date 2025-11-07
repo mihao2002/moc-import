@@ -471,7 +471,7 @@ namespace LDraw.Editor
                         }
                         // string imagePath = Path.Combine(imageFolder, $"{matName}_{filename}.png");
 
-                        CreateImage(filename, go, ldrawCamera, rt);
+                        CreateImage(partLoader, filename, go, ldrawCamera, rt);
                         go.SetActive(false);
 
                         go.transform.position = part.position;
@@ -551,7 +551,7 @@ namespace LDraw.Editor
                 yield return null;
                 previewNavigator.HideCurrentModel();
                 previewNavigator.GotoStep(i, false);
-                CreateStepImage(i, ldrawCamera, rt);
+                CreateStepImage(partLoader, i, ldrawCamera, rt);
             }
 
             navigator = new LDrawFlatStepNavigator(models, new LDrawCamera(mainCamera, false), flatSteps);
@@ -613,13 +613,14 @@ namespace LDraw.Editor
             return map;
         }
 
-        public static void CreateImage(string filename, GameObject go, LDrawCamera camera, RenderTexture rt)
+        public static void CreateImage(LDrawPartLoader partLoader, string filename, GameObject go, LDrawCamera camera, RenderTexture rt)
         {
             string imageFolder = "Assets/Resources/LDrawImages";
             // string colorKey = $"{color.r:F3}_{color.g:F3}_{color.b:F3}";
             // string matName = $"Mat_{colorKey}";
             // var filename = partId.Replace('\\', '_');
-            string imagePath = Path.Combine(imageFolder, $"{filename}.png");
+            string fullFileName = $"{filename}.png";
+            string imagePath = Path.Combine(imageFolder, fullFileName);
 
             if (File.Exists(imagePath))
             {
@@ -630,37 +631,22 @@ namespace LDraw.Editor
                 Directory.CreateDirectory(imageFolder);
 
             var image = GenerateImageFromMeshPrefabTransparent(go, camera, rt);
-            SaveTextureAsPNG(image, imagePath);
+            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "LDrawImages");
         }
 
-        public static void CreateStepImage(int step, LDrawCamera camera, RenderTexture rt)
+        public static void CreateStepImage(LDrawPartLoader partLoader, int step, LDrawCamera camera, RenderTexture rt)
         {
             string imageFolder = "Assets/Resources/LDrawStepImages";
-            string imagePath = Path.Combine(imageFolder, $"{step}.png");
+            string fullFileName = $"{step}.png";
+            string imagePath = Path.Combine(imageFolder, fullFileName);
 
             if (!Directory.Exists(imageFolder))
                 Directory.CreateDirectory(imageFolder);
 
             var image = RenderCamera(camera, rt);
-            SaveTextureAsPNG(image, imagePath);         
+            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "LDrawStepImages");         
         }
 
-        public static void SaveTextureAsPNG(Texture2D texture, string fullPath)
-        {
-            byte[] bytes = texture.EncodeToPNG();
-
-            // Write the file
-            File.WriteAllBytes(fullPath, bytes);
-
-            // Tell Unity to import it
-            AssetDatabase.ImportAsset(fullPath);
-            
-            // Set import settings to Sprite
-            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(fullPath);
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.SaveAndReimport();
-        }
 
         private static Texture2D RenderCamera(LDrawCamera camera, RenderTexture rt, int resolution = 512)
         {

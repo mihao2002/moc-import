@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Meshes_1
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Meshes_1
-  m_GUID: a3431ba94ca069a479fc915a9d489d4a
+  m_GUID: b21f5b3965bb48c4c843fb3bb7090ea9
   m_SerializeEntries:
   - m_GUID: 22033c509e404c8468115202ba6129d5
     m_Address: LDrawMeshes/-bumperbackright.ldr

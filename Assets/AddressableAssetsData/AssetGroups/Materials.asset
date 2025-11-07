@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Materials
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Materials
-  m_GUID: 563530a48043aae4ba3195c64c58f600
+  m_GUID: 7ff4c0ef2d46bf84395caa216da37d75
   m_SerializeEntries:
   - m_GUID: 0b3763feaf8810f4ab4f049abe1e2904
     m_Address: LDrawMaterials/Mat_0.839_0.475_0.137

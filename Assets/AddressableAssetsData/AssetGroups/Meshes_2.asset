@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Meshes_2
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Meshes_2
-  m_GUID: 0c285bd37e86b994e813ee374c2d9a23
+  m_GUID: c9464e621e9277846a34ba3b2c66fff1
   m_SerializeEntries:
   - m_GUID: 003d73eb959053a45a0614b920d8a1b8
     m_Address: LDrawMeshes/-temp30.ldr

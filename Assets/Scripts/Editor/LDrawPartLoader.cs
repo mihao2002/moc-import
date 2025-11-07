@@ -132,6 +132,25 @@ namespace LDraw.Editor
             return mat;
         }
 
+        public void SaveTextureAsPNG(Texture2D texture, string fullPath, string fileName, string folder)
+        {
+            byte[] bytes = texture.EncodeToPNG();
+
+            // Write the file
+            File.WriteAllBytes(fullPath, bytes);
+
+            // Tell Unity to import it
+            AssetDatabase.ImportAsset(fullPath);
+            
+            // Set import settings to Sprite
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(fullPath);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.SaveAndReimport();
+
+            AddToAddressableGroup(fullPath, "Images", $"{folder}/{fileName}");
+        }
+
         private void AddToAddressableGroup(string path, string groupName, string address)
         {
             // --- Add to default Addressables group with custom address ---

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Prefabs
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Prefabs
-  m_GUID: 5b7ecc632a05fb54184c6276ebdcd930
+  m_GUID: 31c38e82f3164ed499c91c87ee3dc8a5
   m_SerializeEntries:
   - m_GUID: 0371f417bba191b4293be3178cb91612
     m_Address: LDrawPrefabs/-hoodbackright.ldr
