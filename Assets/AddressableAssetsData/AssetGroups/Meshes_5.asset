@@ -11,9 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
   m_Name: Meshes_5
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Meshes_5
-  m_GUID: b4736f59a87bfe14db3db52ed29d6726
+  m_GUID: 41910a7346aa9714aa4378a2a7681653
   m_SerializeEntries:
   - m_GUID: da534cba55f4ee340832fec75d337700
     m_Address: LDrawMeshes/-chassis.ldr

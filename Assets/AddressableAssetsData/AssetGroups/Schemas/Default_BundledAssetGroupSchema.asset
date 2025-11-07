@@ -24,6 +24,7 @@ MonoBehaviour:
   m_BundledAssetProviderType:
     m_AssemblyName: Unity.ResourceManager, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     m_ClassName: UnityEngine.ResourceManagement.ResourceProviders.BundledAssetProvider
+  m_StripDownloadOptions: 0
   m_ForceUniqueProvider: 0
   m_UseAssetBundleCache: 1
   m_UseAssetBundleCrc: 1
@@ -34,9 +35,9 @@ MonoBehaviour:
   m_RedirectLimit: -1
   m_RetryCount: 0
   m_BuildPath:
-    m_Id: 71bd378e2e069464594143a64cd545fe
+    m_Id: 9d0dd68b2ddca1f45abbb29655665339
   m_LoadPath:
-    m_Id: 69a4ed28273e7c74187282e868e15f28
+    m_Id: 1f5dd6cf9176dfc48b95422ffce21c0e
   m_BundleMode: 0
   m_AssetBundleProviderType:
     m_AssemblyName: Unity.ResourceManager, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null

@@ -11,9 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
   m_Name: Prefabs
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Prefabs
-  m_GUID: 4ff4dbc8788a21e48a21babec8d5c9fb
+  m_GUID: 5b7ecc632a05fb54184c6276ebdcd930
   m_SerializeEntries:
   - m_GUID: 0371f417bba191b4293be3178cb91612
     m_Address: LDrawPrefabs/-hoodbackright.ldr
