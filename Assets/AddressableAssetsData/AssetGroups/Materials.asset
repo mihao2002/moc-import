@@ -13,111 +13,127 @@ MonoBehaviour:
   m_Name: Materials
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Materials
-  m_GUID: 7ff4c0ef2d46bf84395caa216da37d75
+  m_GUID: 44c74985d7f7bd6459bd63b61e5b96f1
   m_SerializeEntries:
-  - m_GUID: 0b3763feaf8810f4ab4f049abe1e2904
+  - m_GUID: 1c4e5134509dbfc4d82a7c675ed5ea56
+    m_Address: LDrawMaterials/Mat_0.537_0.490_0.384
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e77d99e6bd5a4c41b42ba48758aa26c
+    m_Address: LDrawMaterials/Mat_0.106_0.165_0.204
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24604387f5e4df64c841385099f92161
+    m_Address: LDrawMaterials/Mat_0.118_0.353_0.659
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 289a737131a452c4f9abad17dacf38a0
+    m_Address: LDrawMaterials/Mat_0.843_0.729_0.549
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2bd7db89feadb484c946098c7ae12e2f
+    m_Address: LDrawMaterials/Mat_0.373_0.192_0.035
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2f40ac91098fad349ace709c02a0cccf
+    m_Address: LDrawMaterials/Mat_0.988_0.988_0.988
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 32fc78135967f904d81ce977c3e30574
+    m_Address: LDrawMaterials/Mat_0.706_0.000_0.000
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4a4196540b83bb44f9fc9b2bca028662
+    m_Address: LDrawMaterials/Mat_1.000_1.000_0.502
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 908072c5fed6f524183234b1b91145b3
+    m_Address: LDrawMaterials/Mat_0.980_0.784_0.039
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 926b428529c763144be9187587d6069d
+    m_Address: LDrawMaterials/Mat_0.392_0.392_0.392
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 953043465db9fd147a91d960f1eb250b
     m_Address: LDrawMaterials/Mat_0.839_0.475_0.137
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 13a5618c2dd23db4ba866d8f99bb2a5b
-    m_Address: LDrawMaterials/Mat_1.000_1.000_0.502
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 475e96ceb0b711b47a1585b8c7bc13de
-    m_Address: LDrawMaterials/Mat_0.118_0.353_0.659
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 49fca832515798d42b8272be1601572d
-    m_Address: LDrawMaterials/Mat_0.588_0.588_0.588
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5f4749b8b0b688946b294512f2869f82
-    m_Address: LDrawMaterials/Mat_0.373_0.192_0.035
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 60e97d3c66eed05438492fa04c3f4815
-    m_Address: LDrawMaterials/Mat_0.329_0.349_0.333
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 73fc2755e5ace974998a1eb8dd8f6471
-    m_Address: LDrawMaterials/Mat_0.843_0.729_0.549
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7bf11e2e65726f9499714201a3f1f953
-    m_Address: LDrawMaterials/Mat_0.392_0.392_0.392
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 80c9ca09905b3af4a95f5556d1409c8b
-    m_Address: LDrawMaterials/Mat_0.816_0.816_0.816
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8134808fa41f79041b9489720f256661
-    m_Address: LDrawMaterials/Mat_0.106_0.165_0.204
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 82e20481fa0cabb43bc6798663caca08
-    m_Address: LDrawMaterials/Mat_0.706_0.000_0.000
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bfadc61a1a881154988bef9852885469
-    m_Address: LDrawMaterials/Mat_0.957_0.957_0.957
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cd35c74406616234caaf959d397241af
-    m_Address: LDrawMaterials/Mat_0.537_0.490_0.384
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: dae6b57aeebb6ce40afdc1cdce906ddc
-    m_Address: LDrawMaterials/Mat_0.988_0.988_0.988
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - All
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: de7ec89c972409e4e8367abddaed4f18
+  - m_GUID: 9e7667a322639a34290323acff2ec1bc
     m_Address: LDrawMaterials/Mat_0.859_0.675_0.204
     m_ReadOnly: 0
     m_SerializedLabels:
-    - All
+    - KoenigseggAgeraRS
+    - LDrawMaterials
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e5c2c8df4f20ec64095a740c553af746
-    m_Address: LDrawMaterials/Mat_0.980_0.784_0.039
+  - m_GUID: 9f6e9cb1df4ca6244b975a89c1548736
+    m_Address: LDrawMaterials/Mat_0.816_0.816_0.816
     m_ReadOnly: 0
     m_SerializedLabels:
-    - All
+    - KoenigseggAgeraRS
+    - LDrawMaterials
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f434a244870db344f9ab5af5a6445160
+  - m_GUID: b29b23b5c61ec3543817ca9af8eb0685
+    m_Address: LDrawMaterials/Mat_0.588_0.588_0.588
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e907fd113aea9094d871458bc046ef9e
+    m_Address: LDrawMaterials/Mat_0.329_0.349_0.333
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ede0106329191fe44aa42dee1c498044
     m_Address: LDrawMaterials/Mat_0.541_0.573_0.553
     m_ReadOnly: 0
     m_SerializedLabels:
-    - All
+    - KoenigseggAgeraRS
+    - LDrawMaterials
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ff26ef0589ac1fc4a8e46d8b730c28af
+    m_Address: LDrawMaterials/Mat_0.957_0.957_0.957
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - KoenigseggAgeraRS
+    - LDrawMaterials
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 29358713b33c9a248a16c0ec1cf79ba8, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: ba781bbdefde3854ca507a281e035239, type: 2}
+    - {fileID: 11400000, guid: 1fce3da2f0925bc48b8b6fc98f6ff744, type: 2}

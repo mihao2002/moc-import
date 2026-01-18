@@ -7,6 +7,5 @@ UserSettings/
 Builds/
 .vs/
 Assets/Resources/
-Assets/Resources_moved/
 .utmp/
 ServerData/**/*.bundle

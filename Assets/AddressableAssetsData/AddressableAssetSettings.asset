@@ -60,16 +60,17 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
+  - {fileID: 11400000, guid: 0592e6c27fbe05942909df88e937b6d2, type: 2}
   - {fileID: 11400000, guid: e2c63d9ea02fbf04bad7de754eb3ad11, type: 2}
-  - {fileID: 11400000, guid: 71d567227e308d34f88514aa46e90121, type: 2}
-  - {fileID: 11400000, guid: cd97a1231d43e164f83a59b0b7fc3120, type: 2}
-  - {fileID: 11400000, guid: 36f856448594c16498884abc200f927d, type: 2}
-  - {fileID: 11400000, guid: 57264f5def7316643828236b15d28ca1, type: 2}
-  - {fileID: 11400000, guid: 0747965814ee3c84cad7ce21ee592f46, type: 2}
-  - {fileID: 11400000, guid: 1c54b9ba26f875b408648b2f1119a275, type: 2}
-  - {fileID: 11400000, guid: 0b6973b17cff49d48adaa7c6e41c3632, type: 2}
-  - {fileID: 11400000, guid: 2d40b360d3636c241bcf7e20912a457e, type: 2}
-  - {fileID: 11400000, guid: 23b2f33cee9ce284a9ee41d0ad8fa66c, type: 2}
+  - {fileID: 11400000, guid: 7affe97241cc11042a8d9ad5295197ac, type: 2}
+  - {fileID: 11400000, guid: ca168dbf9ef66ad41960c7fbf4222be5, type: 2}
+  - {fileID: 11400000, guid: 75acf64d6d1c3ef44a508b5d67b9d0d9, type: 2}
+  - {fileID: 11400000, guid: 5ae7d6e9800897f4da652aebe85fc589, type: 2}
+  - {fileID: 11400000, guid: f2c0b7f5c45602e49b7b07824eb58f61, type: 2}
+  - {fileID: 11400000, guid: 0be86a57d37c45646b8f3d75e878c43c, type: 2}
+  - {fileID: 11400000, guid: 3002a95c24b67b84d86f6091fb9c132b, type: 2}
+  - {fileID: 11400000, guid: 0a2047469a45fe14ba4d4acdef7c016c, type: 2}
+  - {fileID: 11400000, guid: aa9d8a7187edaa642babcb1fd73f4db6, type: 2}
   m_BuildSettings:
     m_LogResourceManagerExceptions: 1
     m_BundleBuildPath: Temp/com.unity.addressables/AssetBundles
@@ -80,7 +81,7 @@ MonoBehaviour:
       m_ProfileName: Default
       m_Values:
       - m_Id: 1f5dd6cf9176dfc48b95422ffce21c0e
-        m_Value: 'https://raw.githubusercontent.com/mihao2002/publicassets/main/BeeBuild/AssetBundles/[BuildTarget]'
+        m_Value: 'https://raw.githubusercontent.com/mihao2002/publicassets/main/BeeBuild/Models/KoenigseggAgeraRS/AssetBundles/[BuildTarget]'
       - m_Id: 69a4ed28273e7c74187282e868e15f28
         m_Value: '{UnityEngine.AddressableAssets.Addressables.RuntimePath}/[BuildTarget]'
       - m_Id: 71bd378e2e069464594143a64cd545fe
@@ -108,8 +109,12 @@ MonoBehaviour:
     m_ProfileVersion: 1
   m_LabelTable:
     m_LabelNames:
-    - default
-    - All
+    - KoenigseggAgeraRS
+    - LDrawMeshes
+    - LDrawMaterials
+    - LDrawPrefabs
+    - LDrawStepImages
+    - LDrawImages
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: ea0c4009545e1e84eadc3a35212e7927, type: 2}

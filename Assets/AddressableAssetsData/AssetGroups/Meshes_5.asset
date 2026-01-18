@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Meshes_5
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Meshes_5
-  m_GUID: 294fdacb21d269e46854c89a109fec61
+  m_GUID: 15a38ed782faa9243843095736431ab9
   m_SerializeEntries:
-  - m_GUID: da534cba55f4ee340832fec75d337700
+  - m_GUID: d0cd3d6e82d63da4b957c7628af609df
     m_Address: LDrawMeshes/-chassis.ldr
     m_ReadOnly: 0
     m_SerializedLabels: []
@@ -24,4 +24,4 @@ MonoBehaviour:
   m_Settings: {fileID: 11400000, guid: 29358713b33c9a248a16c0ec1cf79ba8, type: 2}
   m_SchemaSet:
     m_Schemas:
-    - {fileID: 11400000, guid: 598676e8054747a44904492173feac48, type: 2}
+    - {fileID: 11400000, guid: 42ce1de00071499468d0ab26f8affaf0, type: 2}

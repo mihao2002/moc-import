@@ -18,6 +18,8 @@ namespace LDraw.Editor
         private string partLibraryPath = "C:/Users/Public/Documents/LDraw";
         private string studioDataPath = "C:/Program Files/Studio 2.0/data";
         private string unofficialPartLibraryPath = "C:/Users/Public/Documents/LDraw/Unofficial;C:/Models/Unofficial";
+
+        private string modelName = "KoenigseggAgeraRS";
         private LDrawFlatStepNavigator navigator;
         
         public Camera mainCamera; // Assign in inspector or via UI        
@@ -102,14 +104,14 @@ namespace LDraw.Editor
         {
             DeleteNonDefaultGroups();
             string[] targets = {
-                "Assets/Resources_moved/LDrawPrefabs",
-                "Assets/Resources_moved/LDrawMeshes",
-                "Assets/Resources_moved/LDrawMaterials",
+                "Assets/Resources/LDrawPrefabs",
+                "Assets/Resources/LDrawMeshes",
+                "Assets/Resources/LDrawMaterials",
                 "Assets/Resources/LDrawImages",
                 "Assets/Resources/LDrawStepImages",
-                "Assets/Resources_moved/LDrawPrefabs.meta",
-                "Assets/Resources_moved/LDrawMaterials.meta",
-                "Assets/Resources_moved/LDrawMeshes.meta",
+                "Assets/Resources/LDrawPrefabs.meta",
+                "Assets/Resources/LDrawMaterials.meta",
+                "Assets/Resources/LDrawMeshes.meta",
                 "Assets/Resources/LDrawImages.meta",
                 "Assets/Resources/LDrawStepImages.meta",
             };
@@ -150,6 +152,10 @@ namespace LDraw.Editor
             }
 
             EditorGUILayout.BeginHorizontal();
+            modelName = EditorGUILayout.TextField("Model Name", modelName);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
             ldrawFilePath = EditorGUILayout.TextField("LDraw File", ldrawFilePath);
             if (GUILayout.Button("...", GUILayout.Width(30)))
             {
@@ -187,37 +193,49 @@ namespace LDraw.Editor
                 if (!string.IsNullOrEmpty(path))
                     unofficialPartLibraryPath = path;
             }
-            EditorGUILayout.EndHorizontal();        
+            EditorGUILayout.EndHorizontal();
 
             if (GUILayout.Button("Load LDraw File"))
             {
                 // LoadLDrawFile();
                 StartLoadingRoutine();
             }
-            
+
             // Show progress bar when loading
             if (isLoading && !isCancelled)
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Loading Progress", EditorStyles.boldLabel);
-                
+
                 // Progress bar
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField("Progress:", GUILayout.Width(60));
                 EditorGUILayout.LabelField($"{progressValue:P1}", GUILayout.Width(50));
                 EditorGUILayout.EndHorizontal();
-                
+
                 // Custom progress bar
                 Rect progressRect = EditorGUILayout.GetControlRect(false, 20);
                 EditorGUI.ProgressBar(progressRect, progressValue, progressMessage);
-                
+
                 // Cancel button
                 if (GUILayout.Button("Cancel Loading"))
                 {
                     isCancelled = true;
                 }
-                
+
                 EditorGUILayout.Space();
+            }
+        }
+        
+        public static void EnsureLabelExists(string label)
+        {
+            var settings = AddressableAssetSettingsDefaultObject.Settings;
+            if (!settings.GetLabels().Contains(label))
+            {
+                settings.AddLabel(label);
+                EditorUtility.SetDirty(settings);
+                AssetDatabase.SaveAssets();
+                Debug.Log($"Added Addressables label: {label}");
             }
         }
 
@@ -230,7 +248,15 @@ namespace LDraw.Editor
             string studioColorPath = Path.Combine(studioDataPath, "StudioColorDefinition.txt");
             var colors = LDrawColorManager.LoadFromFile(ldconfigPath, studioColorPath);
             // Set the max mesh size is 100M
-            var partLoader = new LDrawPartLoader(colors, 1024*1024*100);
+            var partLoader = new LDrawPartLoader(colors, 1024 * 1024 * 100, modelName);
+
+            // Add a label
+            EnsureLabelExists(modelName);
+            EnsureLabelExists("LDrawMeshes");
+            EnsureLabelExists("LDrawMaterials");
+            EnsureLabelExists("LDrawPrefabs");
+            EnsureLabelExists("LDrawStepImages");
+            EnsureLabelExists("LDrawImages");
 
             OnProgressUpdate(0f, "Clearing cache...");
             yield return null;
@@ -631,7 +657,7 @@ namespace LDraw.Editor
                 Directory.CreateDirectory(imageFolder);
 
             var image = GenerateImageFromMeshPrefabTransparent(go, camera, rt);
-            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "LDrawImages");
+            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "Images", "LDrawImages");
         }
 
         public static void CreateStepImage(LDrawPartLoader partLoader, int step, LDrawCamera camera, RenderTexture rt)
@@ -644,7 +670,7 @@ namespace LDraw.Editor
                 Directory.CreateDirectory(imageFolder);
 
             var image = RenderCamera(camera, rt);
-            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "LDrawStepImages");         
+            partLoader.SaveTextureAsPNG(image, imagePath, fullFileName, "StepImages", "LDrawStepImages");         
         }
 
 

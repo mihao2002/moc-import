@@ -36,11 +36,14 @@ namespace LDraw.Editor
         private long meshSize = 0;
         private long maxMeshSize;
 
+        private string modelName;
 
-        public LDrawPartLoader(Dictionary<int, LDrawColor> colors, long maxMeshSize)
+
+        public LDrawPartLoader(Dictionary<int, LDrawColor> colors, long maxMeshSize, string modelName)
         {
             this.colors = colors;
             this.maxMeshSize = maxMeshSize;
+            this.modelName = modelName;
             usedColors = new HashSet<int>();
             partDescriptions = new Dictionary<string, LDrawPartDesc>();
             mainMaterial = GetOrCreateMaterial(mainColorIndex);
@@ -72,7 +75,7 @@ namespace LDraw.Editor
 
         public Mesh SaveMeshAsset(Mesh mesh, string meshName)
         {
-            string meshFolder = "Assets/Resources_moved/LDrawMeshes";
+            string meshFolder = "Assets/Resources/LDrawMeshes";
             if (!Directory.Exists(meshFolder))
             {
                 Directory.CreateDirectory(meshFolder);
@@ -101,14 +104,14 @@ namespace LDraw.Editor
                 meshSize = 0;
             }
 
-            AddToAddressableGroup(meshAssetPath, $"Meshes_{meshSuffix}", $"LDrawMeshes/{fileName}");
+            AddToAddressableGroup(meshAssetPath, $"Meshes_{meshSuffix}", $"LDrawMeshes/{fileName}", "LDrawMeshes");
 
             return newMesh;
         }
 
         public Material GetOrCreateMaterial(int colorIdx)
         {
-            string materialFolder = "Assets/Resources_moved/LDrawMaterials";
+            string materialFolder = "Assets/Resources/LDrawMaterials";
             if (!Directory.Exists(materialFolder))
                 Directory.CreateDirectory(materialFolder);
 
@@ -127,12 +130,12 @@ namespace LDraw.Editor
             AssetDatabase.CreateAsset(mat, matPath);
             AssetDatabase.SaveAssets();
 
-            AddToAddressableGroup(matPath, "Materials", $"LDrawMaterials/Mat_{colorKey}");
+            AddToAddressableGroup(matPath, "Materials", $"LDrawMaterials/Mat_{colorKey}", "LDrawMaterials");
 
             return mat;
         }
 
-        public void SaveTextureAsPNG(Texture2D texture, string fullPath, string fileName, string folder)
+        public void SaveTextureAsPNG(Texture2D texture, string fullPath, string fileName, string folder, string label)
         {
             byte[] bytes = texture.EncodeToPNG();
 
@@ -148,10 +151,10 @@ namespace LDraw.Editor
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.SaveAndReimport();
 
-            AddToAddressableGroup(fullPath, "Images", $"{folder}/{fileName}");
+            AddToAddressableGroup(fullPath, folder, $"LDraw{folder}/{fileName}", label);
         }
 
-        private void AddToAddressableGroup(string path, string groupName, string address)
+        private void AddToAddressableGroup(string path, string groupName, string address, string label)
         {
             // --- Add to default Addressables group with custom address ---
             var settings = AddressableAssetSettingsDefaultObject.Settings;
@@ -187,9 +190,14 @@ namespace LDraw.Editor
                 entry.address = address;
 
                 // --- Add the "All" label ---
-                if (!entry.labels.Contains("All"))
+                if (!entry.labels.Contains(modelName))
                 {
-                    entry.labels.Add("All");
+                    entry.labels.Add(modelName);
+                }
+
+                if (!entry.labels.Contains(label))
+                {
+                    entry.labels.Add(label);
                 }
             }
             else
@@ -1259,7 +1267,7 @@ namespace LDraw.Editor
 
         private void SaveObjectToPrefab(string partId, GameObject go)
         {
-            string prefabFolder = "Assets/Resources_moved/LDrawPrefabs"; // keep consistent with new Addressables location
+            string prefabFolder = "Assets/Resources/LDrawPrefabs"; // keep consistent with new Addressables location
             if (!Directory.Exists(prefabFolder))
                 Directory.CreateDirectory(prefabFolder);
 
@@ -1272,7 +1280,7 @@ namespace LDraw.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            AddToAddressableGroup(prefabPath, "Prefabs", $"LDrawPrefabs/{fileName}");
+            AddToAddressableGroup(prefabPath, "Prefabs", $"LDrawPrefabs/{fileName}", "LDrawPrefabs");
         }
 
         private static bool MatrixIsMirrored(Matrix4x4 m)
