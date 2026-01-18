@@ -54,7 +54,6 @@ function normalizeKey(id: string): string {
 }
 
 async function main() {
-    const startTime = Date.now();
     const argv = await yargs(process.argv.slice(2))
         .option('input', { alias: 'i', type: 'string', description: 'Input .ldr file', demandOption: true })
         .option('output', { alias: 'o', type: 'string', description: 'Output directory', demandOption: true })
@@ -440,7 +439,6 @@ async function main() {
 
     let p2Count = 0;
     const p2Total = allModels.length;
-    let partsExported = 0; // Tracking detailed progress
 
     for (const [modelName, modelData] of allModels) {
         p2Count++;
@@ -495,9 +493,6 @@ async function main() {
 
                         // Generate OBJ for Blender
                         const outModelPath = path.join(outputDir, 'models', `${safeName}.obj`);
-
-                        Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeName})`); // Log BEFORE export
-
                         if (!fs.existsSync(outModelPath)) {
                             await objExporter.exportModel(submodelData, outModelPath);
                         }
@@ -509,9 +504,7 @@ async function main() {
                         Logger.log(`Generating submodel thumbnail: ${safeName}`);
                         try {
                             if (renderer instanceof BlenderService) {
-                                await renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), undefined, (argv['save-blend'] as boolean));
-                                partsExported++;
-                                // Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported})`); // Moved up
+                                renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), undefined, (argv['save-blend'] as boolean));
                             } else {
                                 // LDView
                                 if (fs.existsSync(outImgPath)) await fs.unlink(outImgPath);
@@ -550,7 +543,6 @@ async function main() {
                                 outModelPath = path.join(outputDir, 'models', `${safeId}.obj`);
                                 // We still export OBJ for 3D viewer, but not for image generation
                                 if (!fs.existsSync(outModelPath)) {
-                                    Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeId})`); // Log BEFORE export
                                     await objExporter.exportPart(part.partId, outModelPath);
                                 }
                             }
@@ -574,10 +566,7 @@ async function main() {
                                             }
                                         }
                                         // Queue Job instead of direct render
-                                        Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeId})`); // Log BEFORE queue
-                                        await renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), colorArg, (argv['save-blend'] as boolean));
-                                        partsExported++;
-                                        // Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported})`); // Moved up
+                                        renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), colorArg, (argv['save-blend'] as boolean));
                                     } else {
                                         // LDView
                                         const tempImgLdr = path.join(outputDir, 'temp', `img_${safeId}_${part.color}.ldr`);
@@ -675,194 +664,124 @@ async function main() {
             }
         }
 
-        let currentStep = 0;
-        const totalSteps = modelData.steps.length;
+    }
 
-        // Pre-calculate Global Bounds for stable incremental centering
-        let globalMinX = Infinity, globalMinY = Infinity, globalMinZ = Infinity;
-        let globalMaxX = -Infinity, globalMaxY = -Infinity, globalMaxZ = -Infinity;
+    let currentStep = 0;
+    const totalSteps = modelData.steps.length;
 
-        // Accumulated Bounds for Step Metadata (Incremental)
-        let currentBoundsMinX = Infinity, currentBoundsMinY = Infinity, currentBoundsMinZ = Infinity;
-        let currentBoundsMaxX = -Infinity, currentBoundsMaxY = -Infinity, currentBoundsMaxZ = -Infinity;
+    for (const step of modelData.steps) {
+        currentStep++;
+        Logger.progress(currentStep, totalSteps, `Rendering Steps`);
+        stepCount++;
 
-        // Include Base Geometry
-        if (modelData.triangles.length > 0 || modelData.quads.length > 0) {
-            for (const tri of modelData.triangles) {
-                [tri.v1, tri.v2, tri.v3].forEach(v => {
-                    if (v.x < globalMinX) globalMinX = v.x; if (v.x > globalMaxX) globalMaxX = v.x;
-                    if (v.y < globalMinY) globalMinY = v.y; if (v.y > globalMaxY) globalMaxY = v.y;
-                    if (v.z < globalMinZ) globalMinZ = v.z; if (v.z > globalMaxZ) globalMaxZ = v.z;
-                });
-            }
-            for (const quad of modelData.quads) {
-                [quad.v1, quad.v2, quad.v3, quad.v4].forEach(v => {
-                    if (v.x < globalMinX) globalMinX = v.x; if (v.x > globalMaxX) globalMaxX = v.x;
-                    if (v.y < globalMinY) globalMinY = v.y; if (v.y > globalMaxY) globalMaxY = v.y;
-                    if (v.z < globalMinZ) globalMinZ = v.z; if (v.z > globalMaxZ) globalMaxZ = v.z;
-                });
-            }
-        }
-        // Include All Steps
-        for (const step of modelData.steps) {
-            for (const part of step.parts) {
-                const pos = part.position;
-                if (pos.x < globalMinX) globalMinX = pos.x; if (pos.x > globalMaxX) globalMaxX = pos.x;
-                if (pos.y < globalMinY) globalMinY = pos.y; if (pos.y > globalMaxY) globalMaxY = pos.y;
-                if (pos.z < globalMinZ) globalMinZ = pos.z; if (pos.z > globalMaxZ) globalMaxZ = pos.z;
-            }
+        // Camera Logic
+        if (step.cameraParams) {
+            currentRotation.x = step.cameraParams.angles.x;
+            // Swap Y and Z for ROTSTEP inputs to align with User Expectation (Z=Vertical Orbit)
+            // while keeping calculateBlenderCamera compatible with Standard View (Y=Vertical Orbit/Yaw)
+            currentRotation.y = step.cameraParams.angles.y;
+            currentRotation.z = step.cameraParams.angles.z;
         }
 
-        const globalCenterX = (globalMinX === Infinity) ? 0 : (globalMinX + globalMaxX) / 2;
-        const globalCenterY = (globalMinY === Infinity) ? 0 : (globalMinY + globalMaxY) / 2;
-        const globalCenterZ = (globalMinZ === Infinity) ? 0 : (globalMinZ + globalMaxZ) / 2;
+        for (const part of step.parts) {
+            const m = part.rotation;
+            const pos = part.position;
 
-        let cumulativeVertexCount = 0;
+            // Update Bounds
+            if (pos.x < minX) minX = pos.x;
+            if (pos.x > maxX) maxX = pos.x;
+            if (pos.y < minY) minY = pos.y;
+            if (pos.y > maxY) maxY = pos.y;
+            if (pos.z < minZ) minZ = pos.z;
+            if (pos.z > maxZ) maxZ = pos.z;
 
-        for (const step of modelData.steps) {
-            currentStep++;
-            Logger.progress(currentStep, totalSteps, `Rendering Steps`);
-            stepCount++;
+            // Logic to reference submodels correctly in the temp LDR
+            const partKey = normalizeKey(part.partId);
+            let targetLdrName = part.partId;
 
-            // Camera Logic
-            if (step.cameraParams) {
-                currentRotation.x = step.cameraParams.angles.x;
-                // Swap Y and Z for ROTSTEP inputs to align with User Expectation (Z=Vertical Orbit)
-                // while keeping calculateBlenderCamera compatible with Standard View (Y=Vertical Orbit/Yaw)
-                currentRotation.y = step.cameraParams.angles.y;
-                currentRotation.z = step.cameraParams.angles.z;
+            let resolvedKey: string | null = null;
+            if (models.has(partKey)) resolvedKey = partKey;
+            else if (models.has(partKey + '.ldr')) resolvedKey = partKey + '.ldr';
+            else if (models.has(partKey + '.mpd')) resolvedKey = partKey + '.mpd';
+
+            if (resolvedKey) {
+                const safePartName = resolvedKey.replace(/[\\/]/g, '_');
+                targetLdrName = `sub_${safePartName}.ldr`;
             }
 
-            for (const part of step.parts) {
-                const m = part.rotation;
-                const pos = part.position;
+            // Pure 1:1 Identity Mapping (No Transforms)
+            // LDraw (x,y,z) is written directly to temporary file as (x,y,z)
+            // Blender Import Settings handle the coordinate system interpretation (Forward=-Y, Up=Z)
 
-                // Update Bounds
-                if (pos.x < minX) minX = pos.x;
-                if (pos.x > maxX) maxX = pos.x;
-                if (pos.y < minY) minY = pos.y;
-                if (pos.y > maxY) maxY = pos.y;
-                if (pos.z < minZ) minZ = pos.z;
-                if (pos.z > maxZ) maxZ = pos.z;
+            const m00 = m.c0.x; const m01 = m.c1.x; const m02 = m.c2.x;
+            const m10 = m.c0.y; const m11 = m.c1.y; const m12 = m.c2.y;
+            const m20 = m.c0.z; const m21 = m.c1.z; const m22 = m.c2.z;
 
-                // Logic to reference submodels correctly in the temp LDR
-                const partKey = normalizeKey(part.partId);
-                let targetLdrName = part.partId;
+            const line = `1 ${part.color} ${pos.x} ${pos.y} ${pos.z} ${m00} ${m01} ${m02} ${m10} ${m11} ${m12} ${m20} ${m21} ${m22} ${targetLdrName}`;
+            cumulativeLines.push(line);
+        }
 
-                let resolvedKey: string | null = null;
-                if (models.has(partKey)) resolvedKey = partKey;
-                else if (models.has(partKey + '.ldr')) resolvedKey = partKey + '.ldr';
-                else if (models.has(partKey + '.mpd')) resolvedKey = partKey + '.mpd';
+        const stepName = `step_${stepCount}`;
+        const stepNameSafe = `${modelName.replace(/[\\/]/g, '_')}_${stepName}`;
+        const stepLdrPath = path.join(outputDir, 'temp', `${stepNameSafe}.ldr`);
+        await fs.writeFile(stepLdrPath, cumulativeLines.join('\n'));
 
-                if (resolvedKey) {
-                    const safePartName = resolvedKey.replace(/[\\/]/g, '_');
-                    targetLdrName = `sub_${safePartName}.ldr`;
-                }
+        const stepImgPath = path.join(stepImgDir, `${stepName}.png`);
+        if (fs.existsSync(stepImgPath)) await fs.unlink(stepImgPath);
 
-                // Pure 1:1 Identity Mapping (No Transforms)
-                // LDraw (x,y,z) is written directly to temporary file as (x,y,z)
-                // Blender Import Settings handle the coordinate system interpretation (Forward=-Y, Up=Z)
+        if (renderer instanceof BlenderService) {
+            // Must convert to OBJ first for Blender
+            // User requirement: Don't keep step OBJs in models folder. Use temp.
+            const stepObjPath = path.join(outputDir, 'temp', `${stepNameSafe}.obj`);
+            let centerX = 0, centerY = 0, centerZ = 0;
 
-                const m00 = m.c0.x; const m01 = m.c1.x; const m02 = m.c2.x;
-                const m10 = m.c0.y; const m11 = m.c1.y; const m12 = m.c2.y;
-                const m20 = m.c0.z; const m21 = m.c1.z; const m22 = m.c2.z;
+            // Logic to reference submodels correctly in the temp LDR
+            const tempModels = await parser.parseModels(stepLdrPath);
+            const tempModelData = tempModels.values().next().value;
+            if (tempModelData) {
+                // Calculate Center (LDraw Coords)
+                centerX = (minX === Infinity) ? 0 : (minX + maxX) / 2;
+                centerY = (minY === Infinity) ? 0 : (minY + maxY) / 2;
+                centerZ = (minZ === Infinity) ? 0 : (minZ + maxZ) / 2;
 
-                const line = `1 ${part.color} ${pos.x} ${pos.y} ${pos.z} ${m00} ${m01} ${m02} ${m10} ${m11} ${m12} ${m20} ${m21} ${m22} ${targetLdrName}`;
-                cumulativeLines.push(line);
-            }
+                // Centering Geometry: Pass center as offset to exportModel
+                await objExporter.exportModel(tempModelData, stepObjPath, { x: centerX, y: centerY, z: centerZ });
 
-            const stepName = `step_${stepCount}`;
-            const stepNameSafe = `${modelName.replace(/[\\/]/g, '_')}_${stepName}`;
-            const stepLdrPath = path.join(outputDir, 'temp', `${stepNameSafe}.ldr`);
-            await fs.writeFile(stepLdrPath, cumulativeLines.join('\n'));
 
-            const stepImgPath = path.join(stepImgDir, `${stepName}.png`);
-            if (fs.existsSync(stepImgPath)) await fs.unlink(stepImgPath);
+                const sizeX = maxX - minX;
+                const sizeY = maxY - minY;
+                const sizeZ = maxZ - minZ;
 
-            if (renderer instanceof BlenderService) {
-                // Must convert to OBJ first for Blender
-                // User requirement: Don't keep step OBJs in models folder. Use temp.
-                const stepObjPath = path.join(outputDir, 'temp', `${stepNameSafe}.obj`);
-                const previousObjPath = path.join(outputDir, 'temp', `${modelName.replace(/[\\/]/g, '_')}_step_${stepCount - 1}.obj`);
+                // Blender Size Mapping: X->X, Y->Z, Z->Y
+                const blenderSizeX = sizeX;
+                const blenderSizeY = sizeZ; // LDraw Z -> Blender Y
+                const blenderSizeZ = sizeY; // LDraw Y -> Blender Z
 
-                const deltaModelData: RuntimeModelData = {
-                    modelName: `${modelName}_step_${stepCount}_delta`,
-                    steps: [{
-                        parts: step.parts, // Only parts for THIS step
-                        cameraParams: null
-                    }],
-                    // Base geometry only goes into step 1
-                    triangles: (stepCount === 1) ? modelData.triangles : [],
-                    quads: (stepCount === 1) ? modelData.quads : [],
-                    dependencies: new Set()
-                };
+                Logger.log(`[Debug] Dimensions (LDraw): W(X)=${sizeX.toFixed(2)}, H(Y)=${sizeY.toFixed(2)}, D(Z)=${sizeZ.toFixed(2)}`);
+                Logger.log(`[Debug] Dimensions (Blender): W(X)=${blenderSizeX.toFixed(2)}, D(Y)=${blenderSizeY.toFixed(2)}, H(Z)=${blenderSizeZ.toFixed(2)}`);
 
-                let appendMode = false;
-                if (stepCount > 1) {
-                    if (fs.existsSync(previousObjPath)) {
-                        await fs.copy(previousObjPath, stepObjPath);
-                        appendMode = true;
-                    } else {
-                        // If file missing, we can't append. Just export non-append (will miss previous steps).
-                        // This shouldn't happen in sequential run.
-                        appendMode = false;
-                    }
-                }
 
-                // Centering Geometry: Pass GLOBAL center as offset to exportModel
-                // This ensures vertices don't shift between steps
-                Logger.progress(currentStep, totalSteps, `Rendering Steps`, " (Generating Geometry Delta...)");
                 try {
-                    const exportResult = await objExporter.exportModel(
-                        deltaModelData,
-                        stepObjPath,
-                        { x: globalCenterX, y: globalCenterY, z: globalCenterZ },
-                        appendMode,
-                        cumulativeVertexCount
-                    );
-                    cumulativeVertexCount += exportResult.count;
+                    // Scan OBJ for true bounding box
+                    const objContent = await fs.readFile(stepObjPath, 'utf-8');
+                    let bMinX = Infinity, bMaxX = -Infinity;
+                    let bMinY = Infinity, bMaxY = -Infinity;
+                    let bMinZ = Infinity, bMaxZ = -Infinity;
 
-                    // Update Accumulated Bounds with THIS step's geometry
-                    // Note: The bounds returned by exportModel are already centered (OBJ coordinates)
-                    // We want to track the total OBJ bounds.
-
-                    // Handle first step initialization if bounds are pristine
-                    if (currentBoundsMinX === Infinity && exportResult.bounds.min.x !== Infinity) {
-                        currentBoundsMinX = exportResult.bounds.min.x;
-                        currentBoundsMaxX = exportResult.bounds.max.x;
-                        currentBoundsMinY = exportResult.bounds.min.y;
-                        currentBoundsMaxY = exportResult.bounds.max.y;
-                        currentBoundsMinZ = exportResult.bounds.min.z;
-                        currentBoundsMaxZ = exportResult.bounds.max.z;
-                    } else if (exportResult.bounds.min.x !== Infinity) {
-                        if (exportResult.bounds.min.x < currentBoundsMinX) currentBoundsMinX = exportResult.bounds.min.x;
-                        if (exportResult.bounds.max.x > currentBoundsMaxX) currentBoundsMaxX = exportResult.bounds.max.x;
-                        if (exportResult.bounds.min.y < currentBoundsMinY) currentBoundsMinY = exportResult.bounds.min.y;
-                        if (exportResult.bounds.max.y > currentBoundsMaxY) currentBoundsMaxY = exportResult.bounds.max.y;
-                        if (exportResult.bounds.min.z < currentBoundsMinZ) currentBoundsMinZ = exportResult.bounds.min.z;
-                        if (exportResult.bounds.max.z > currentBoundsMaxZ) currentBoundsMaxZ = exportResult.bounds.max.z;
+                    for (const line of objContent.split('\n')) {
+                        if (line.startsWith('v ')) {
+                            const parts = line.trim().split(/\s+/);
+                            const x = parseFloat(parts[1]);
+                            const y = parseFloat(parts[2]);
+                            const z = parseFloat(parts[3]);
+                            if (x < bMinX) bMinX = x;
+                            if (x > bMaxX) bMaxX = x;
+                            if (y < bMinY) bMinY = y;
+                            if (y > bMaxY) bMaxY = y;
+                            if (z < bMinZ) bMinZ = z;
+                            if (z > bMaxZ) bMaxZ = z;
+                        }
                     }
-
-                    // Determine bounds for camera (using Global Bounds allows static camera)
-                    const sizeX = globalMaxX - globalMinX;
-                    const sizeY = globalMaxY - globalMinY;
-                    const sizeZ = globalMaxZ - globalMinZ;
-
-                    // Blender Size Mapping: X->X, Y->Z, Z->Y
-                    const blenderSizeX = sizeX;
-                    const blenderSizeY = sizeZ; // LDraw Z -> Blender Y
-                    const blenderSizeZ = sizeY; // LDraw Y -> Blender Z
-
-                    Logger.log(`[Debug] Dimensions (LDraw): W(X)=${sizeX.toFixed(2)}, H(Y)=${sizeY.toFixed(2)}, D(Z)=${sizeZ.toFixed(2)}`);
-                    Logger.log(`[Debug] Dimensions (Blender): W(X)=${blenderSizeX.toFixed(2)}, D(Y)=${blenderSizeY.toFixed(2)}, H(Z)=${blenderSizeZ.toFixed(2)}`);
-
-                    // Use Accumulated Bounds for this Step Metadata
-                    const bMinX = currentBoundsMinX;
-                    const bMaxX = currentBoundsMaxX;
-                    const bMinY = currentBoundsMinY;
-                    const bMaxY = currentBoundsMaxY;
-                    const bMinZ = currentBoundsMinZ;
-                    const bMaxZ = currentBoundsMaxZ;
 
                     const bSizeX = bMaxX - bMinX;
                     const bSizeY = bMaxY - bMinY;
@@ -875,67 +794,64 @@ async function main() {
 
                     // Store metadata for App usage (using ACTUAL geometry bounds)
                     // bMinX is the OBJ coordinate (centered). Add centerX to get World coordinate.
-                    (step as any).center = { x: globalCenterX, y: globalCenterY, z: globalCenterZ };
+                    (step as any).center = { x: centerX, y: centerY, z: centerZ };
                     (step as any).bounds = {
-                        min: { x: bMinX + globalCenterX, y: bMinY + globalCenterY, z: bMinZ + globalCenterZ },
-                        max: { x: bMaxX + globalCenterX, y: bMaxY + globalCenterY, z: bMaxZ + globalCenterZ }
+                        min: { x: bMinX + centerX, y: bMinY + centerY, z: bMinZ + centerZ },
+                        max: { x: bMaxX + centerX, y: bMaxY + centerY, z: bMaxZ + centerZ }
                     };
 
                     // We only support Blender for step images currently (due to advanced camera logic)
                     if (renderer instanceof BlenderService) {
-                        await renderer.queueJob(stepObjPath, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
+                        renderer.queueJob(stepObjPath, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
                             currentRotation.x,
                             currentRotation.y,
                             currentRotation.z,
                             argv.height // zoom
                         ), undefined, (argv['save-blend'] as boolean));
-                        Logger.progress(currentStep, totalSteps, `Rendering Steps`, " (Queued)");
                     }
                 } catch (e) {
                     Logger.error(`Failed to render step ${stepNameSafe}:`, e);
                 }
                 // Optional: Delete temp OBJ after render if we want to be super clean, but temp dir is for temp stuff.
-            } else {
-                console.log(`Generating step image: ${modelName} / ${stepName}`);
-                try {
-                    await renderer.exportSnapshot(stepLdrPath, stepImgPath, 1024, 768, undefined, { ...currentRotation });
-                } catch (e) {
-                    console.error(`Failed to render step ${stepNameSafe}:`, e);
-                }
             }
-
-            // Update JSON
-            (step as any).imageName = `${subDir}/${stepName}.png`;
+        } else {
+            console.log(`Generating step image: ${modelName} / ${stepName}`);
+            try {
+                await renderer.exportSnapshot(stepLdrPath, stepImgPath, 1024, 768, undefined, { ...currentRotation });
+            } catch (e) {
+                console.error(`Failed to render step ${stepNameSafe}:`, e);
+            }
         }
+
+        // Update JSON
+        (step as any).imageName = `${subDir}/${stepName}.png`;
     }
-
-    console.log(`Final Array Length: ${stepsDataList.length}`);
-    await fs.writeJson(path.join(outputDir, 'data', 'steps.json'), stepsDataList, { spaces: 2 });
-
-    // Create simplified metadata for easy app consumption
-    const simpleMetadata: any = {};
-    for (const model of stepsDataList) {
-        simpleMetadata[model.name] = {
-            steps: model.data.steps.map((s: any) => ({
-                stepNumber: model.data.steps.indexOf(s) + 1,
-                center: s.center || { x: 0, y: 0, z: 0 },
-                bounds: s.bounds || {}
-            }))
-        };
-    }
-    await fs.writeJson(path.join(outputDir, 'data', 'steps_metadata.json'), simpleMetadata, { spaces: 2 });
-
-    // Execute Batch Render if applicable
-    if (renderer instanceof BlenderService) {
-        Logger.log("--- Flushing remaining render jobs ---");
-        await renderer.executeQueue();
-    }
-
-    const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000;
-    Logger.finishProgress();
-    Logger.log(`Done. Total execution time: ${duration.toFixed(2)} seconds.`);
 }
+
+console.log(`Final Array Length: ${stepsDataList.length}`);
+await fs.writeJson(path.join(outputDir, 'data', 'steps.json'), stepsDataList, { spaces: 2 });
+
+// Create simplified metadata for easy app consumption
+const simpleMetadata: any = {};
+for (const model of stepsDataList) {
+    simpleMetadata[model.name] = {
+        steps: model.data.steps.map((s: any) => ({
+            stepNumber: model.data.steps.indexOf(s) + 1,
+            center: s.center || { x: 0, y: 0, z: 0 },
+            bounds: s.bounds || {}
+        }))
+    };
+}
+await fs.writeJson(path.join(outputDir, 'data', 'steps_metadata.json'), simpleMetadata, { spaces: 2 });
+
+// Execute Batch Render if applicable
+if (renderer instanceof BlenderService) {
+    Logger.log("--- Flushing remaining render jobs ---");
+    await renderer.executeQueue();
+}
+
+Logger.finishProgress();
+Logger.log("Done.");
 
 main().catch(err => {
     Logger.error(err);

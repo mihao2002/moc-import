@@ -3,6 +3,7 @@ import sys
 import math
 import os
 import argparse
+import json
 from mathutils import Vector, Matrix
 
 # Blender Internal Utilities
@@ -266,8 +267,8 @@ if __name__ == "__main__":
     args = argv[argv.index("--") + 1:]
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', required=True)
-    parser.add_argument('--output', required=True)
+    parser.add_argument('--input', required=False)
+    parser.add_argument('--output', required=False)
     parser.add_argument('--width', type=int, default=512)
     parser.add_argument('--height', type=int, default=512)
     
@@ -287,13 +288,10 @@ if __name__ == "__main__":
     parser.add_argument('--g', type=float, required=False)
     parser.add_argument('--b', type=float, required=False)
     parser.add_argument('--save_blend', action='store_true', help="Save .blend file for debugging")
+    parser.add_argument('--batch', type=str, required=False, help="Path to batch JSON file")
     
     args = parser.parse_args(args)
     
-    color = None
-    if args.r is not None and args.g is not None and args.b is not None:
-        color = (args.r, args.g, args.b)
-
     # Convert sRGB (0-1) to Linear RGB for Blender
     def srgb_to_linear(c):
         if c <= 0.04045:
@@ -301,22 +299,66 @@ if __name__ == "__main__":
         else:
             return pow((c + 0.055) / 1.055, 2.4)
 
-    color_linear = None
-    if color:
-        color_linear = (
-            srgb_to_linear(color[0]), 
-            srgb_to_linear(color[1]), 
-            srgb_to_linear(color[2])
-        )
+    if args.batch:
+        try:
+            with open(args.batch, 'r') as f:
+                batch_jobs = json.load(f)
+                
+            print(f"[Blender Debug] Starting Batch Processing of {len(batch_jobs)} jobs...")
+            for i, job in enumerate(batch_jobs):
+                print(f"[Blender Debug] Processing Batch Job {i+1}/{len(batch_jobs)}")
+                
+                # Parse Color if present
+                job_color = None
+                if 'color' in job and job['color']:
+                    c = job['color']
+                    job_color = (
+                        srgb_to_linear(c['r']), 
+                        srgb_to_linear(c['g']), 
+                        srgb_to_linear(c['b'])
+                    )
 
-    setup_scene(
-        args.input, 
-        args.output, 
-        args.width, 
-        args.height,
-        (args.locX, args.locY, args.locZ),
-        (args.lookAtX, args.lookAtY, args.lookAtZ),
-        (args.upX, args.upY, args.upZ),
-        color_linear,
-        save_blend=args.save_blend
-    )
+                setup_scene(
+                    job['input'],
+                    job['output'],
+                    job['width'],
+                    job['height'],
+                    (job['locX'], job['locY'], job['locZ']),
+                    (job['lookAtX'], job['lookAtY'], job['lookAtZ']),
+                    (job['upX'], job['upY'], job['upZ']),
+                    job_color,
+                    save_blend=job.get('save_blend', False)
+                )
+                # Force garbage collection / cleanup if needed, but reset_scene should handle it
+        except Exception as e:
+             print(f"[Blender Debug] Batch Processing Failed: {e}")
+             sys.exit(1)
+             
+    else:            
+        if not args.input or not args.output:
+            print("[Blender Debug] Error: --input and --output are required unless --batch is used.")
+            sys.exit(1)
+
+        color = None
+        if args.r is not None and args.g is not None and args.b is not None:
+            color = (args.r, args.g, args.b)
+
+        color_linear = None
+        if color:
+            color_linear = (
+                srgb_to_linear(color[0]), 
+                srgb_to_linear(color[1]), 
+                srgb_to_linear(color[2])
+            )
+
+        setup_scene(
+            args.input, 
+            args.output, 
+            args.width, 
+            args.height,
+            (args.locX, args.locY, args.locZ),
+            (args.lookAtX, args.lookAtY, args.lookAtZ),
+            (args.upX, args.upY, args.upZ),
+            color_linear,
+            save_blend=args.save_blend
+        )

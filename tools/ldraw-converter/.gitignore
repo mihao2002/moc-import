@@ -3,3 +3,4 @@ output*/
 debug_*
 *.log
 .DS_Store
+dist/
