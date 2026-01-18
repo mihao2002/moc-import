@@ -495,7 +495,7 @@ async function main() {
                         console.log(`Generating submodel thumbnail: ${safeName}`);
                         try {
                             if (renderer instanceof BlenderService) {
-                                await (renderer as any).render(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0));
+                                await renderer.render(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), undefined, undefined, undefined, (argv['save-blend'] as boolean));
                             } else {
                                 // LDView
                                 if (fs.existsSync(outImgPath)) await fs.unlink(outImgPath);
@@ -556,7 +556,7 @@ async function main() {
                                                 colorArg = { r, g, b };
                                             }
                                         }
-                                        await (renderer as any).render(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), colorArg);
+                                        await renderer.render(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), colorArg, undefined, undefined, (argv['save-blend'] as boolean));
                                     } else {
                                         // LDView
                                         const tempImgLdr = path.join(outputDir, 'temp', `img_${safeId}_${part.color}.ldr`);
@@ -784,15 +784,12 @@ async function main() {
 
                         // We only support Blender for step images currently (due to advanced camera logic)
                         if (renderer instanceof BlenderService) {
-                            await (renderer as any).render(stepObjPath, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
+                            await renderer.render(stepObjPath, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
                                 currentRotation.x,
                                 currentRotation.y,
                                 currentRotation.z,
-                                argv.height,
-                                undefined,
-                                step.center, // pass geometric center
-                                step.bounds // pass geometric bounds
-                            ));
+                                argv.height // zoom
+                            ), undefined, step.center, step.bounds, (argv['save-blend'] as boolean));
                         }
                     } catch (e) {
                         console.error(`Failed to render step ${stepNameSafe}:`, e);

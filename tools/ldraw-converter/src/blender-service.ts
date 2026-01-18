@@ -17,7 +17,7 @@ export class BlenderService {
         this.scriptPath = path.resolve(__dirname, 'blender/render_script.py');
     }
 
-    public async render(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, center?: { x: number, y: number, z: number }, bounds?: { min: { x: number, y: number, z: number }, max: { x: number, y: number, z: number } }): Promise<void> {
+    public async render(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, center?: { x: number, y: number, z: number }, bounds?: { min: { x: number, y: number, z: number }, max: { x: number, y: number, z: number } }, saveBlend: boolean = false): Promise<void> {
         // Ensure output dir exists
         await fs.ensureDir(path.dirname(outputPath));
 
@@ -44,6 +44,10 @@ export class BlenderService {
             args.push(`--r=${color.r.toFixed(4)}`);
             args.push(`--g=${color.g.toFixed(4)}`);
             args.push(`--b=${color.b.toFixed(4)}`);
+        }
+
+        if (saveBlend) {
+            args.push('--save_blend');
         }
 
         return new Promise((resolve, reject) => {

@@ -15,7 +15,7 @@ def reset_scene():
         for block in collection:
             collection.remove(block)
 
-def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_look_at, cam_up, override_color=None):
+def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_look_at, cam_up, override_color=None, save_blend=False):
     print(f"[Blender Debug] STARTING SETUP for {obj_path}")
     sys.stdout.flush()
     reset_scene()
@@ -251,9 +251,10 @@ def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_
     # scene.eevee.use_gtao = True # Ambient Occlusion equivalent
     
     # Save Blend file for debugging
-    blend_path = output_path.replace(".png", ".blend")
-    bpy.ops.wm.save_as_mainfile(filepath=blend_path)
-    print(f"[Blender Debug] Saved .blend file to {blend_path}")
+    if save_blend:
+        blend_path = output_path.replace(".png", ".blend")
+        bpy.ops.wm.save_as_mainfile(filepath=blend_path)
+        print(f"[Blender Debug] Saved .blend file to {blend_path}")
 
     bpy.ops.render.render(write_still=True)
 
@@ -285,6 +286,7 @@ if __name__ == "__main__":
     parser.add_argument('--r', type=float, required=False)
     parser.add_argument('--g', type=float, required=False)
     parser.add_argument('--b', type=float, required=False)
+    parser.add_argument('--save_blend', action='store_true', help="Save .blend file for debugging")
     
     args = parser.parse_args(args)
     
@@ -315,5 +317,6 @@ if __name__ == "__main__":
         (args.locX, args.locY, args.locZ),
         (args.lookAtX, args.lookAtY, args.lookAtZ),
         (args.upX, args.upY, args.upZ),
-        color_linear
+        color_linear,
+        save_blend=args.save_blend
     )
