@@ -56,6 +56,9 @@ export interface RuntimeModelData {
     // Actually, Type 1 lines are parsed as "parts" in steps. 
     // For a .dat file, it usually has 0 steps (or 1 implicit step).
     dependencies: Set<string>;
+    // Alias feature: Treat this submodel as a single part with this ID
+    alias?: string;
+    description?: string;
 }
 
 export class LDrawParser {
@@ -116,6 +119,8 @@ export class LDrawParser {
         const triangles: LDrawTriangle[] = [];
         const quads: LDrawQuad[] = [];
         let currentRotation: { x: number, y: number, z: number, type: string } | undefined;
+        let alias: string | undefined;
+        let description: string | undefined;
 
         for (const line of lines) {
             const trimmed = line.trim();
@@ -146,30 +151,35 @@ export class LDrawParser {
                         const z = parseFloat(tokens[4]);
                         const rotType = tokens[5] || "ABS";
 
-                        // If the current step already has a specific camera assigned (and hasn't been pushed yet),
-                        // and we encounter ANOTHER ROTSTEP, we should treat the previous one as a complete "view step".
-                        // This allows for sequences of view changes (animations) without adding parts.
                         if (currentStep.cameraParams && currentStep.parts.length === 0) {
                             steps.push(currentStep);
                             currentStep = { parts: [] };
                         }
 
-                        // Update persistent state
                         currentRotation = { x, y, z, type: rotType };
 
-                        // Apply to current step - it terminates this step with this view
                         if (!currentStep.cameraParams) currentStep.cameraParams = {};
                         currentStep.cameraParams.angles = { ...currentRotation };
                     }
 
-                    // ROTSTEP acts as a step delimiter if we have parts
                     if (currentStep.parts.length > 0) {
                         steps.push(currentStep);
                         currentStep = { parts: [] };
                     }
+                } else if (directive === "COMMENT") {
+                    // Feature: 0 COMMENT <alias>:<description>
+                    const commentContent = line.replace(/^\s*0\s+COMMENT\s+/i, "").trim();
+                    if (commentContent.includes(":")) {
+                        const parts = commentContent.split(":");
+                        if (parts.length >= 2) {
+                            if (!alias) {
+                                alias = parts[0].trim();
+                                description = parts.slice(1).join(":").trim();
+                            }
+                        }
+                    }
                 }
             } else if (type === "1") {
-                // Part/Submodel reference
                 if (tokens.length >= 15) {
                     const color = parseInt(tokens[1]);
                     const x = parseFloat(tokens[2]);
@@ -180,7 +190,6 @@ export class LDrawParser {
                     const m20 = parseFloat(tokens[11]); const m21 = parseFloat(tokens[12]); const m22 = parseFloat(tokens[13]);
                     const partFile = tokens.slice(14).join(" ").toLowerCase();
 
-                    // Pure 1:1 Mapping (No Transforms)
                     const part: LDrawPart = {
                         partId: partFile,
                         color: color,
@@ -198,24 +207,18 @@ export class LDrawParser {
                     dependencies.add(partFile);
                 }
             } else if (type === "3") {
-                // Triangle
-                // 3 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3
                 if (tokens.length >= 11) {
                     triangles.push({
                         color: parseInt(tokens[1]),
-                        // Raw Coordinates (No Z-flip, No Winding Change)
                         v1: { x: parseFloat(tokens[2]), y: parseFloat(tokens[3]), z: parseFloat(tokens[4]) },
                         v2: { x: parseFloat(tokens[5]), y: parseFloat(tokens[6]), z: parseFloat(tokens[7]) },
                         v3: { x: parseFloat(tokens[8]), y: parseFloat(tokens[9]), z: parseFloat(tokens[10]) }
                     });
                 }
             } else if (type === "4") {
-                // Quad
-                // 4 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3 x4 y4 z4
                 if (tokens.length >= 14) {
                     quads.push({
                         color: parseInt(tokens[1]),
-                        // Raw Coordinates (No Z-flip, No Winding Change)
                         v1: { x: parseFloat(tokens[2]), y: parseFloat(tokens[3]), z: parseFloat(tokens[4]) },
                         v2: { x: parseFloat(tokens[5]), y: parseFloat(tokens[6]), z: parseFloat(tokens[7]) },
                         v3: { x: parseFloat(tokens[8]), y: parseFloat(tokens[9]), z: parseFloat(tokens[10]) },
@@ -226,16 +229,13 @@ export class LDrawParser {
         }
 
         if (currentStep.parts.length > 0 || currentStep.cameraParams) {
-            // Inherit rotation for final step
             if (currentRotation) {
                 if (!currentStep.cameraParams) currentStep.cameraParams = {};
-                // Only if not already set (which it won't be if it's just parts)
                 if (!currentStep.cameraParams.angles) currentStep.cameraParams.angles = { ...currentRotation };
             }
             steps.push(currentStep);
         }
 
-        // Fix for Geometry-Only Models (e.g. flexible parts defined in MPD without explicit steps)
         if (steps.length === 0 && (triangles.length > 0 || quads.length > 0)) {
             steps.push({ parts: [] });
         }
@@ -245,7 +245,9 @@ export class LDrawParser {
             steps,
             triangles,
             quads,
-            dependencies
+            dependencies,
+            alias,
+            description
         };
     }
 }

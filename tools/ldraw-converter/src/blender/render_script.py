@@ -95,7 +95,7 @@ def setup_line_art(objects):
     # Set Crease Angle for Filtering
     # 135 degrees (approx 2.356 rad) is standard to catch 90 degree corners but ignore flat/shallow triangulation
     if hasattr(vl, 'freestyle_settings'):
-        vl.freestyle_settings.crease_angle = math.radians(135)
+        vl.freestyle_settings.crease_angle = math.radians(130)
     
     # Apply Shade Smooth to avoid triangulation lines
     for obj in objects:
@@ -289,39 +289,38 @@ def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_
         distance_h = group_radius / math.tan(horizontal_fov / 2.0)
         base_distance = max(distance_v, distance_h)
         near_clip = cam_data.clip_start
-        final_distance = max(base_distance + near_clip, base_distance * 1.3)
-        new_loc = Vector((0,0,0)) - (direction * final_distance)
+        final_distance = max(base_distance + near_clip, base_distance * 1.4)
+        new_loc = group_center - (direction * final_distance)
         cam_obj.location = new_loc
 
     # ===========================================================================
     # OVERRIDE COLOR (For Parts/Single Item Renders)
     # ===========================================================================
     if override_color:
-        mat_override = bpy.data.materials.new(name="OverrideColor")
-        mat_override.use_nodes = True
-        bsdf = mat_override.node_tree.nodes.get("Principled BSDF")
-        if bsdf:
-            # Revert sRGB conversion to match the vibrant "Step" style
-            # Treating input as Linear makes it appear brighter/more vibrant.
+        # Smart Override: Only modify the "Main Color" (code_16) material.
+        # This preserves fixed colors (like code_4 Red) in submodels.
+        
+        target_mats = [m for m in bpy.data.materials if m.name.startswith("code_16")]
+        
+        if target_mats:
             r = override_color[0]
             g = override_color[1]
             b = override_color[2]
             
-            bsdf.inputs['Base Color'].default_value = (r, g, b, 1.0)
-            # Higher roughness for flatter, more cartoon/instruction look
-            bsdf.inputs['Roughness'].default_value = 0.8
-            # Low Specular to avoid greying out
-            bsdf.inputs['Specular IOR Level'].default_value = 0.2 
+            for mat in target_mats:
+                mat.use_nodes = True
+                bsdf = mat.node_tree.nodes.get("Principled BSDF")
+                if bsdf:
+                    # Revert sRGB conversion to match the vibrant "Step" style
+                    bsdf.inputs['Base Color'].default_value = (r, g, b, 1.0)
+                    # Higher roughness for flatter, more cartoon/instruction look
+                    bsdf.inputs['Roughness'].default_value = 0.8
+                    # Low Specular to avoid greying out
+                    bsdf.inputs['Specular IOR Level'].default_value = 0.2
             
-        for obj in all_objects:
-            if obj.type == 'MESH':
-                if obj.data.materials:
-                    # Replace first material (Main Color)
-                    obj.data.materials[0] = mat_override
-                else:
-                    obj.data.materials.append(mat_override)
-        
-        print(f"[Blender Debug] Applied Override Color: {override_color}")
+            print(f"[Blender Debug] Applied Override Color to {len(target_mats)} materials (code_16).")
+        else:
+            print("[Blender Debug] No 'code_16' materials found. Skipping color override.")
 
     # ===========================================================================
     # LIGHTING STAGE - AMBIENT ONLY

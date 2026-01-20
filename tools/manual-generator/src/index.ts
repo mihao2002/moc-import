@@ -283,18 +283,18 @@ function generateHtml(ops: PageOp[], assetBase: string, models: LDrawOutput[]): 
             .part-item .pid { font-size: 14px; margin-top: 5px; color: #888; font-family: monospace; }
             .badge { 
                 position: absolute; 
-                top: -10px; 
-                right: -10px; 
+                top: 5px; 
+                right: 5px; 
                 background: #e74c3c; 
                 color: white; 
                 font-weight: bold; 
                 border-radius: 50%; 
-                width: 40px; 
-                height: 40px; 
+                width: 36px; 
+                height: 36px; 
                 display: flex; 
                 align-items: center; 
                 justify-content: center; 
-                font-size: 20px;
+                font-size: 18px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.2);
                 border: 2px solid white;
             }
@@ -378,7 +378,6 @@ function generateHtml(ops: PageOp[], assetBase: string, models: LDrawOutput[]): 
                         ${hierarchyHtml}
                     </div>
                     <div class="step-num-container">
-                        <div class="step-label">Step</div>
                         <div class="step-num">${op.stepIndex}</div>
                     </div>
                 </div>
@@ -391,7 +390,7 @@ function generateHtml(ops: PageOp[], assetBase: string, models: LDrawOutput[]): 
                     </div>
                 </div>
                 <div class="footer">
-                    <div>Page ${index + 1}</div>
+                    <div style="font-weight: bold; color: #333;">${index + 1}</div>
                 </div>
             </div>
             `;

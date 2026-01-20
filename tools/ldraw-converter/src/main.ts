@@ -500,48 +500,102 @@ async function main() {
                 (part as any).isSubmodel = isSubmodel;
 
                 if (isSubmodel && submodelData) {
-                    part.isSubmodel = true;
+                    // Feature: Alias - Treat submodel as a regular part
+                    if (submodelData.alias) {
+                        const aliasId = submodelData.alias;
+                        const safeAlias = aliasId.replace(/[\\/]/g, '_');
+                        part.isSubmodel = false; // Treat as part for instructions
+                        (part as any).partId = aliasId;
+                        (part as any).isSubmodel = false;
 
-                    const safeName = resolvedKey!.replace(/[\\/]/g, '_');
-                    const tempSubPath = path.join(outputDir, 'temp', `sub_${safeName}.ldr`);
+                        const outImgName = `${safeAlias}_${part.color}.png`;
+                        const outImgPath = path.join(outputDir, 'images', 'parts', outImgName);
+                        (part as any).imageName = `parts/${outImgName}`;
 
-                    // CRITICAL FIX: We MUST write the submodel LDR to disk so objExporter can find it!
-                    if (!processedSubmodels.has(resolvedKey!)) {
-                        processedSubmodels.add(resolvedKey!);
+                        // 1. Export Geometry (One time per Alias ID)
+                        if (!processedParts.has(aliasId)) {
+                            processedParts.add(aliasId);
 
-                        processedSubmodels.add(resolvedKey!);
+                            const outModelPath = path.join(outputDir, 'models', `${safeAlias}.obj`);
 
-                        // Generate OBJ for Blender
-                        const outModelPath = path.join(outputDir, 'models', `${safeName}.obj`);
-
-                        Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeName})`); // Log BEFORE export
-
-                        if (!fs.existsSync(outModelPath)) {
-                            await objExporter.exportModel(submodelData, outModelPath);
+                            if (!fs.existsSync(outModelPath)) {
+                                Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeAlias} [Alias])`);
+                                await objExporter.exportModel(submodelData, outModelPath);
+                            }
                         }
 
-                        const outImgName = `${safeName}.png`;
-                        const outImgPath = path.join(outputDir, 'images', 'submodels', outImgName);
-                        (part as any).imageName = `submodels/${outImgName}`;
+                        // 2. Render Image (Per Color)
+                        if (!fs.existsSync(outImgPath)) {
+                            const outModelPath = path.join(outputDir, 'models', `${safeAlias}.obj`);
+                            try {
+                                if (renderer instanceof BlenderService) {
+                                    // Calculate Color
+                                    let colorArg = undefined;
+                                    if (colorMap.has(part.color)) {
+                                        const c = colorMap.get(part.color)!;
+                                        if (c.hex && c.hex.startsWith('#')) {
+                                            const r = parseInt(c.hex.substring(1, 3), 16) / 255.0;
+                                            const g = parseInt(c.hex.substring(3, 5), 16) / 255.0;
+                                            const b = parseInt(c.hex.substring(5, 7), 16) / 255.0;
+                                            colorArg = { r, g, b };
+                                        }
+                                    }
 
-                        Logger.log(`Generating submodel thumbnail: ${safeName}`);
-                        try {
-                            if (renderer instanceof BlenderService) {
-                                await renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), undefined, (argv['save-blend'] as boolean));
-                                partsExported++;
-                                // Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported})`); // Moved up
-                            } else {
-                                // LDView
-                                if (fs.existsSync(outImgPath)) await fs.unlink(outImgPath);
-                                // Standard submodel view: 45, 30
-                                await renderer.exportSnapshot(tempSubPath, outImgPath, argv.width, argv.height, undefined, { x: 45, y: 30, z: 0 });
+                                    // Render with standard part settings + Color Override
+                                    await renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), colorArg, (argv['save-blend'] as boolean));
+                                    partsExported++;
+                                } else {
+                                    // LDView Fallback
+                                    // For Alias, we treat it as a part. We can't easily use exportSnapshot on LDR because we lack the override color mechanism for LDRs easily without modifying content.
+                                    // But since we have the OBJ, we are likely using Blender.
+                                    // If we MUST support LDView, we'd need to generate a temp LDR that invokes the alias submodel with the correct color code?
+                                    // For now, assuming Blender as primary.
+                                    Logger.log("[WARN] Alias color rendering not fully optimized for LDView.");
+                                }
+                            } catch (e) {
+                                Logger.error(`Failed to render aliased part ${safeAlias}:`, e);
                             }
-                        } catch (e) {
-                            Logger.error(`Failed to render submodel ${safeName}:`, e);
                         }
                     } else {
-                        const outImgName = `${safeName}.png`;
-                        (part as any).imageName = `submodels/${outImgName}`;
+                        // Standard Submodel Handling
+                        part.isSubmodel = true;
+
+                        const safeName = resolvedKey!.replace(/[\\/]/g, '_');
+                        const tempSubPath = path.join(outputDir, 'temp', `sub_${safeName}.ldr`);
+
+                        if (!processedSubmodels.has(resolvedKey!)) {
+                            processedSubmodels.add(resolvedKey!);
+
+                            // Generate OBJ for Blender
+                            const outModelPath = path.join(outputDir, 'models', `${safeName}.obj`);
+
+                            Logger.progress(p2Count, p2Total, "Exporting Assets", ` (Part: ${partsExported} - ${safeName})`);
+
+                            if (!fs.existsSync(outModelPath)) {
+                                await objExporter.exportModel(submodelData, outModelPath);
+                            }
+
+                            const outImgName = `${safeName}.png`;
+                            const outImgPath = path.join(outputDir, 'images', 'submodels', outImgName);
+                            (part as any).imageName = `submodels/${outImgName}`;
+
+                            Logger.log(`Generating submodel thumbnail: ${safeName}`);
+                            try {
+                                if (renderer instanceof BlenderService) {
+                                    await renderer.queueJob(outModelPath, outImgPath, argv.width, argv.height, calculateBlenderCamera(45, 30, 0), undefined, (argv['save-blend'] as boolean));
+                                    partsExported++;
+                                } else {
+                                    // LDView
+                                    if (fs.existsSync(outImgPath)) await fs.unlink(outImgPath);
+                                    await renderer.exportSnapshot(tempSubPath, outImgPath, argv.width, argv.height, undefined, { x: 45, y: 30, z: 0 });
+                                }
+                            } catch (e) {
+                                Logger.error(`Failed to render submodel ${safeName}:`, e);
+                            }
+                        } else {
+                            const outImgName = `${safeName}.png`;
+                            (part as any).imageName = `submodels/${outImgName}`;
+                        }
                     }
                 } else {
                     let partFile = findPartFile(part.partId, libraryPaths);
@@ -634,6 +688,11 @@ async function main() {
         p3Count++;
         const modelName = stepModel.name;
         const modelData = stepModel.data;
+
+        if (modelData.alias) {
+            Logger.log(`Skipping instruction generation for aliased model: ${modelName} (Alias: ${modelData.alias})`);
+            continue;
+        }
 
         Logger.log(`Processing Model ${p3Count}/${p3Total}: ${modelName} (${modelData.steps.length} steps)`);
 
@@ -822,6 +881,10 @@ async function main() {
                 for (const [name, data] of models) {
                     stepExporter.registerModel(name, data);
                     stepExporter.registerModel(normalizeKey(name), data);
+                    if (data.alias) {
+                        stepExporter.registerModel(data.alias, data);
+                        stepExporter.registerModel(normalizeKey(data.alias), data);
+                    }
                 }
 
                 // 1. Export Deltas Standalone (for Highlighting)
