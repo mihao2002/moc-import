@@ -27,6 +27,7 @@ export interface RenderJob {
     save_blend?: boolean;
     center?: { x: number, y: number, z: number };
     bounds?: { min: { x: number, y: number, z: number }, max: { x: number, y: number, z: number } };
+    delta_input?: string; // For step highlighting
 }
 
 export class BlenderService {
@@ -40,9 +41,10 @@ export class BlenderService {
         this.scriptPath = path.resolve(__dirname, 'blender/render_script.py');
     }
 
-    public async queueJob(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, saveBlend: boolean = false) {
+    public async queueJob(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, saveBlend: boolean = false, deltaObjPath?: string) {
         this.jobQueue.push({
             input: objPath,
+            delta_input: deltaObjPath,
             output: outputPath,
             width,
             height,
@@ -118,7 +120,7 @@ export class BlenderService {
         });
     }
 
-    public async render(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, center?: { x: number, y: number, z: number }, bounds?: { min: { x: number, y: number, z: number }, max: { x: number, y: number, z: number } }, saveBlend: boolean = false): Promise<void> {
+    public async render(objPath: string, outputPath: string, width: number, height: number, camera: CameraTransform, color?: { r: number, g: number, b: number }, center?: { x: number, y: number, z: number }, bounds?: { min: { x: number, y: number, z: number }, max: { x: number, y: number, z: number } }, saveBlend: boolean = false, deltaObjPath?: string): Promise<void> {
         // Ensure output dir exists
         await fs.ensureDir(path.dirname(outputPath));
 
@@ -149,6 +151,10 @@ export class BlenderService {
 
         if (saveBlend) {
             args.push('--save_blend');
+        }
+
+        if (deltaObjPath) {
+            args.push('--model_new', deltaObjPath);
         }
 
         return new Promise((resolve, reject) => {

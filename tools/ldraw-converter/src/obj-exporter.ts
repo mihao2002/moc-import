@@ -19,6 +19,7 @@ interface ObjectGroupData {
 
 export class ObjExporter {
     private parser: LDrawParser;
+    private internalParser = new LDrawParser(); // Separate parser for loading parts to avoid clearing the main parser's map
     private partCache: Map<string, RuntimeModelData> = new Map();
     private libraryPaths: string[] = [];
 
@@ -101,20 +102,55 @@ export class ObjExporter {
         if (this.partCache.has(partId)) return this.partCache.get(partId)!;
 
         // Try resolving via Parser (MPD support)
-        const mpdModel = this.parser.getModel(partId);
+        let mpdModel = this.parser.getModel(partId);
+
+        // Robust Lookup Logic: Handle Extension and Slash mismatches
+        if (!mpdModel) {
+            // 1. Try stripping extension (e.g. 'sub.ldr' -> 'sub')
+            const noExt = partId.replace(/\.(ldr|dat|mpd)$/i, '');
+            if (noExt !== partId) {
+                mpdModel = this.parser.getModel(noExt);
+            }
+
+            // 2. Try normalizing slashes (e.g. 'sub/part' <-> 'sub\part')
+            if (!mpdModel) {
+                const withForward = partId.replace(/\\/g, '/');
+                if (withForward !== partId) mpdModel = this.parser.getModel(withForward);
+
+                if (!mpdModel) {
+                    const withBack = partId.replace(/\//g, '\\');
+                    if (withBack !== partId) mpdModel = this.parser.getModel(withBack);
+                }
+            }
+
+            // 3. Try both (No Ext + Normalized Slashes)
+            if (!mpdModel && noExt !== partId) {
+                const withForward = noExt.replace(/\\/g, '/');
+                if (withForward !== noExt) mpdModel = this.parser.getModel(withForward);
+
+                if (!mpdModel) {
+                    const withBack = noExt.replace(/\//g, '\\');
+                    if (withBack !== noExt) mpdModel = this.parser.getModel(withBack);
+                }
+            }
+        }
+
         if (mpdModel) {
+            // Cache using the REQUESTED partId to speed up next lookup
+            console.log(`[ObjExporter] Resolved MPD: ${partId} -> ${mpdModel.modelName}`);
             this.partCache.set(partId, mpdModel);
             return mpdModel;
         }
 
         const file = this.findPartFile(partId);
         if (!file) {
-            // console.warn(`Part definition not found: ${partId}`);
+            console.warn(`[ObjExporter] Part definition not found: ${partId}`);
             return null;
         }
+        console.log(`[ObjExporter] Resolved Disk: ${partId} -> ${file}`);
 
         const content = await fs.readFile(file, 'utf-8');
-        const map = this.parser.parseString(content);
+        const map = this.internalParser.parseString(content);
         // parser returns a map, usually with one entry named after the file or "main.ldr"
         // We take the first one
         const data = map.values().next().value;

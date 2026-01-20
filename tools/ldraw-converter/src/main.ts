@@ -1,4 +1,4 @@
-
+﻿
 import yargs from 'yargs';
 import * as path from 'path';
 import * as fs from 'fs-extra';
@@ -65,6 +65,7 @@ async function main() {
         .option('width', { type: 'number', description: 'Output image width', default: 512 })
         .option('height', { type: 'number', description: 'Output image height', default: 512 })
         .option('quiet', { type: 'boolean', description: 'Suppress console output', default: false })
+        .option('save-blend', { type: 'boolean', description: 'Save Blender project files' })
         .help()
         .argv;
 
@@ -390,17 +391,21 @@ async function main() {
                 const partKey = normalizeKey(part.partId);
                 let targetLdrName = part.partId;
 
+                // Helper to strip extension
+                const stripExt = (s: string) => s.replace(/\.(ldr|mpd|dat)$/i, '');
+                const keyNoExt = stripExt(partKey);
+
                 let resolvedKey: string | null = null;
                 if (models.has(partKey)) resolvedKey = partKey;
                 else if (models.has(partKey + '.ldr')) resolvedKey = partKey + '.ldr';
                 else if (models.has(partKey + '.mpd')) resolvedKey = partKey + '.mpd';
+                else if (models.has(keyNoExt)) resolvedKey = keyNoExt;
 
                 if (resolvedKey) {
                     const safePartName = resolvedKey.replace(/[\\/]/g, '_');
                     targetLdrName = `sub_${safePartName}.ldr`;
                 }
 
-                // Pure 1:1 - No Un-Negation needed
                 const rawX = pos.x;
                 const rawY = pos.y;
                 const rawZ = pos.z;
@@ -445,7 +450,7 @@ async function main() {
     for (const [modelName, modelData] of allModels) {
         p2Count++;
         Logger.progress(p2Count, p2Total, "Exporting Assets");
-        // Logger.log(`Processing model: ${modelName}`); 
+
         stepsDataList.push({ name: modelName, data: modelData });
 
         // Always export the model itself to OBJ (if it's not the main model, or even if it is)
@@ -466,32 +471,45 @@ async function main() {
                 // Smart Lookup for Submodels
                 let isSubmodel = false;
                 let submodelData: RuntimeModelData | undefined;
-                let resolvedKey = partKey;
+                let resolvedKey: string | null = null;
+
+                // Helper to strip extension
+                const stripExt = (s: string) => s.replace(/\.(ldr|mpd|dat)$/i, '');
+                const keyNoExt = stripExt(partKey);
 
                 if (models.has(partKey)) {
                     isSubmodel = true;
                     submodelData = models.get(partKey);
                     resolvedKey = partKey;
-                } else {
-                    if (models.has(partKey + '.ldr')) {
-                        isSubmodel = true;
-                        submodelData = models.get(partKey + '.ldr');
-                        resolvedKey = partKey + '.ldr';
-                    } else if (models.has(partKey + '.mpd')) {
-                        isSubmodel = true;
-                        submodelData = models.get(partKey + '.mpd');
-                        resolvedKey = partKey + '.mpd';
-                    }
+                } else if (models.has(partKey + '.ldr')) {
+                    isSubmodel = true;
+                    submodelData = models.get(partKey + '.ldr');
+                    resolvedKey = partKey + '.ldr';
+                } else if (models.has(partKey + '.mpd')) {
+                    isSubmodel = true;
+                    submodelData = models.get(partKey + '.mpd');
+                    resolvedKey = partKey + '.mpd';
+                } else if (models.has(keyNoExt)) {
+                    // Check WITHOUT extension (e.g. ref "sub.ldr" -> model "sub")
+                    isSubmodel = true;
+                    submodelData = models.get(keyNoExt);
+                    resolvedKey = keyNoExt;
                 }
+
+                // Persist isSubmodel flag to part object for JSON output
+                (part as any).isSubmodel = isSubmodel;
 
                 if (isSubmodel && submodelData) {
                     part.isSubmodel = true;
 
-                    const safeName = resolvedKey.replace(/[\\/]/g, '_');
+                    const safeName = resolvedKey!.replace(/[\\/]/g, '_');
                     const tempSubPath = path.join(outputDir, 'temp', `sub_${safeName}.ldr`);
 
-                    if (!processedSubmodels.has(resolvedKey)) {
-                        processedSubmodels.add(resolvedKey);
+                    // CRITICAL FIX: We MUST write the submodel LDR to disk so objExporter can find it!
+                    if (!processedSubmodels.has(resolvedKey!)) {
+                        processedSubmodels.add(resolvedKey!);
+
+                        processedSubmodels.add(resolvedKey!);
 
                         // Generate OBJ for Blender
                         const outModelPath = path.join(outputDir, 'models', `${safeName}.obj`);
@@ -781,7 +799,6 @@ async function main() {
 
             if (renderer instanceof BlenderService) {
                 // Must convert to OBJ first for Blender
-                // User requirement: Don't keep step OBJs in models folder. Use temp.
                 const stepObjPath = path.join(outputDir, 'temp', `${stepNameSafe}.obj`);
                 const previousObjPath = path.join(outputDir, 'temp', `${modelName.replace(/[\\/]/g, '_')}_step_${stepCount - 1}.obj`);
 
@@ -797,23 +814,39 @@ async function main() {
                     dependencies: new Set()
                 };
 
+                let deltaObjPath = path.join(outputDir, 'temp', `delta_${stepNameSafe}.obj`);
+
+                // Create FRESH ObjExporter per step to ensure clean state and prevent submodel transformation leakage
+                const stepExporter = new ObjExporter(parser, libraryPaths);
+                // Re-register known models to the fresh exporter
+                for (const [name, data] of models) {
+                    stepExporter.registerModel(name, data);
+                    stepExporter.registerModel(normalizeKey(name), data);
+                }
+
+                // 1. Export Deltas Standalone (for Highlighting)
+                // Start Vertex 0 because it's a fresh file for Blender
+                await stepExporter.exportModel(
+                    deltaModelData,
+                    deltaObjPath,
+                    { x: globalCenterX, y: globalCenterY, z: globalCenterZ },
+                    false, // No append
+                    0
+                );
+
+                // 2. Export/Append to Accumulation Chain (for next steps)
                 let appendMode = false;
                 if (stepCount > 1) {
                     if (fs.existsSync(previousObjPath)) {
                         await fs.copy(previousObjPath, stepObjPath);
                         appendMode = true;
-                    } else {
-                        // If file missing, we can't append. Just export non-append (will miss previous steps).
-                        // This shouldn't happen in sequential run.
-                        appendMode = false;
                     }
                 }
 
-                // Centering Geometry: Pass GLOBAL center as offset to exportModel
-                // This ensures vertices don't shift between steps
+                // Centering Geometry: Pass GLOBAL center as offset
                 Logger.progress(currentStep, totalSteps, `Rendering Steps`, " (Generating Geometry Delta...)");
                 try {
-                    const exportResult = await objExporter.exportModel(
+                    const exportResult = await stepExporter.exportModel(
                         deltaModelData,
                         stepObjPath,
                         { x: globalCenterX, y: globalCenterY, z: globalCenterZ },
@@ -883,18 +916,22 @@ async function main() {
 
                     // We only support Blender for step images currently (due to advanced camera logic)
                     if (renderer instanceof BlenderService) {
-                        await renderer.queueJob(stepObjPath, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
+                        // Input = Previous Accumulation (exists?) -> Ghosted
+                        // Delta = Current Step (deltaObjPath) -> Opaque
+                        const renderInput = fs.existsSync(previousObjPath) ? previousObjPath : ""; // Empty if first step
+
+                        await renderer.queueJob(renderInput, stepImgPath, argv.width, argv.height, calculateBlenderCamera(
                             currentRotation.x,
                             currentRotation.y,
                             currentRotation.z,
                             argv.height // zoom
-                        ), undefined, (argv['save-blend'] as boolean));
+                        ), undefined, (argv['save-blend'] as boolean), deltaObjPath); // Pass delta!
+
                         Logger.progress(currentStep, totalSteps, `Rendering Steps`, " (Queued)");
                     }
                 } catch (e) {
                     Logger.error(`Failed to render step ${stepNameSafe}:`, e);
                 }
-                // Optional: Delete temp OBJ after render if we want to be super clean, but temp dir is for temp stuff.
             } else {
                 console.log(`Generating step image: ${modelName} / ${stepName}`);
                 try {

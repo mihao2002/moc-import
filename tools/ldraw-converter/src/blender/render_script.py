@@ -6,8 +6,150 @@ import argparse
 import json
 from mathutils import Vector, Matrix
 
-# Blender Internal Utilities
-# ...
+# =================================================================================
+# LINE ART UTILITIES
+# =================================================================================
+
+def setup_line_art(objects):
+    """Setup Freestyle Line Art with Per-Object Color."""
+    print("[Blender Debug] Setting up Freestyle Line Art...")
+    
+    # Create Collections for Line Coloring
+    col_light = bpy.data.collections.get("LightParts")
+    if not col_light:
+        col_light = bpy.data.collections.new("LightParts")
+        bpy.context.scene.collection.children.link(col_light)
+        
+    col_dark = bpy.data.collections.get("DarkParts")
+    if not col_dark:
+        col_dark = bpy.data.collections.new("DarkParts")
+        bpy.context.scene.collection.children.link(col_dark)
+    
+    # Pre-process Geometry: Merge Vertices to remove internal borders
+    # LDraw parts are often separate primitives. Freestyle draws 'Borders' at seams.
+    # Merging them turns seams into 'Creases' which we can filter by angle.
+    bpy.ops.object.select_all(action='DESELECT')
+    
+    for obj in objects:
+        if obj.type != 'MESH':
+            continue
+            
+        # Select and make active
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+        
+        # Merge by Distance
+        # We can use geometry nodes or edit mode. Edit mode is reliable.
+        # Check standard LDraw precision. 0.001 is usually safe.
+        try:
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            # Increase threshold to 0.05 to aggressively merge LDraw primitives
+            bpy.ops.mesh.remove_doubles(threshold=0.05)
+            # Recalculate normals to ensure consistent shading after merge
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode='OBJECT')
+        except Exception as e:
+            print(f"[Blender Debug] Failed to merge vertices for {obj.name}: {e}")
+            
+        obj.select_set(False)
+
+    # Classify Objects
+    for obj in objects:
+        if obj.type != 'MESH':
+            continue
+            
+        is_dark = False
+        if obj.data.materials:
+            mat = obj.data.materials[0]
+            if mat and mat.use_nodes and mat.node_tree:
+                # Try to find Base Color in Principled BSDF
+                bsdf = mat.node_tree.nodes.get("Principled BSDF")
+                if bsdf:
+                    c = bsdf.inputs['Base Color'].default_value
+                    brightness = (c[0] * 0.299) + (c[1] * 0.587) + (c[2] * 0.114)
+                    
+                    # Debug Color Detection
+                    print(f"[Blender Debug] LineArt Color Check: {obj.name} | RGB=({c[0]:.2f}, {c[1]:.2f}, {c[2]:.2f}) | Brightness={brightness:.2f}")
+
+                    if brightness < 0.05: # Strict Threshold for "Black" parts only (Dark Grey is ~0.2)
+                        is_dark = True
+        
+        # Link to appropriate collection
+        # Note: Objects are already linked to Main Collection. We add them to these for Freestyle targeting.
+        if is_dark:
+            if obj.name not in col_dark.objects:
+                col_dark.objects.link(obj)
+        else:
+            if obj.name not in col_light.objects:
+                col_light.objects.link(obj)
+
+    # Enable Freestyle
+    bpy.context.scene.render.use_freestyle = True
+    bpy.context.scene.render.line_thickness = 1.0 
+    
+    # Configure View Layer
+    vl = bpy.context.view_layer
+    vl.use_freestyle = True
+    
+    # Set Crease Angle for Filtering
+    # 135 degrees (approx 2.356 rad) is standard to catch 90 degree corners but ignore flat/shallow triangulation
+    if hasattr(vl, 'freestyle_settings'):
+        vl.freestyle_settings.crease_angle = math.radians(135)
+    
+    # Apply Shade Smooth to avoid triangulation lines
+    for obj in objects:
+        if obj.type == 'MESH':
+            # Shade Smooth to blend flat faces
+            # In Blender 4.1+, this sets polygon smoothing.
+            # We don't necessarily need "Auto Smooth" modifier if we trust Freestyle Crease Angle, 
+            # but Auto Smooth helps shading.
+            # For simplicity, just basic Smooth.
+            for poly in obj.data.polygons:
+                poly.use_smooth = True
+    
+    # Clear Default Line Sets
+    if hasattr(vl, 'freestyle_settings'):
+        fs = vl.freestyle_settings
+        # Remove all existing line sets
+        while fs.linesets:
+            fs.linesets.remove(fs.linesets[0])
+            
+        # 1. Black Lines for Light Parts
+        ls_black = fs.linesets.new("BlackLines")
+        ls_black.select_by_collection = True
+        ls_black.collection = col_light
+        ls_black.select_silhouette = True
+        ls_black.select_border = True
+        ls_black.select_crease = True # Good for LEGO edges
+        # ls_black.select_edge_mark = True
+        
+        # Create Black Style
+        style_black = bpy.data.linestyles.new("StyleBlack")
+        style_black.color = (0, 0, 0)
+        style_black.thickness = 2.0
+        ls_black.linestyle = style_black
+        
+        # 2. White Lines for Dark Parts
+        ls_white = fs.linesets.new("WhiteLines")
+        ls_white.select_by_collection = True
+        ls_white.collection = col_dark
+        ls_white.select_silhouette = True
+        ls_white.select_border = True
+        ls_white.select_crease = True
+        
+        # Create White Style
+        style_white = bpy.data.linestyles.new("StyleWhite")
+        style_white.color = (1, 1, 1)
+        style_white.thickness = 2.0
+        ls_white.linestyle = style_white
+        
+        print("[Blender Debug] Freestyle Setup Complete.")
+
+
+# =================================================================================
+# MAIN SCENE SETUP
+# =================================================================================
 
 def reset_scene():
     bpy.ops.object.select_all(action='SELECT')
@@ -16,224 +158,200 @@ def reset_scene():
         for block in collection:
             collection.remove(block)
 
-def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_look_at, cam_up, override_color=None, save_blend=False):
-    print(f"[Blender Debug] STARTING SETUP for {obj_path}")
+def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_look_at, cam_up, override_color=None, save_blend=False, delta_path=None):
+    print(f"[Blender Debug] STARTING SETUP for {obj_path} (Delta: {delta_path})")
+    print(f"[Blender Debug] Script Version: LINE_ART_V1")
     sys.stdout.flush()
     reset_scene()
 
-    # Import OBJ with Explicit Orientation (Identity Mapping: LDraw(x,y,z) -> Blender(x,y,z))
-    # forward_axis='Y' ensures +Y is Forward (LDraw +Y is Down, but we want to map axes 1:1)
-    # The separate objects will be imported as separate Blender objects.
-    try:
-        bpy.ops.wm.obj_import(filepath=obj_path, forward_axis='Y', up_axis='Z')
-    except Exception as e:
-        print(f"[Blender Debug] Import FAILED: {e}")
+    # Generic Import Function
+    def import_obj(path):
+        try:
+            bpy.ops.wm.obj_import(filepath=path, forward_axis='Y', up_axis='Z')
+            return list(bpy.context.selected_objects)
+        except Exception as e:
+            print(f"[Blender Debug] Import FAILED for {path}: {e}")
+            sys.stdout.flush()
+            return []
+
+    imported_objects = []
+    
+    if obj_path:
+        imported_objects = import_obj(obj_path)
+    
+    delta_objects = []
+    if delta_path:
+        # Deselect old ones first
+        bpy.ops.object.select_all(action='DESELECT')
+        delta_objects = import_obj(delta_path)
+
+    all_objects = imported_objects + delta_objects
+
+    if not all_objects:
+        print("[Blender Debug] CRITICAL: No imported objects found!")
         sys.stdout.flush()
         return
 
-    imported_object = None
+    # SEPARATION PASS: Ensure Multi-Material Objects (like Submodels) are split
+    # so we can assign different Outline Colors to different parts.
+    final_objects = []
     
-    # Strategy 1: Check selected objects (Importer usually selects them)
-    # Identify Imported Objects
-    imported_objects = list(bpy.context.selected_objects)
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in all_objects:
+        if obj.type == 'MESH':
+            bpy.context.view_layer.objects.active = obj
+            obj.select_set(True)
+            # Check if multiple materials exist
+            if len(obj.data.materials) > 1:
+                try:
+                    bpy.ops.mesh.separate(type='MATERIAL')
+                    # The separate op changes selection to include new parts
+                    separated = bpy.context.selected_objects
+                    final_objects.extend(separated)
+                except Exception as e:
+                    print(f"[Blender Debug] Separation failed for {obj.name}: {e}")
+                    final_objects.append(obj)
+            else:
+                final_objects.append(obj)
+            obj.select_set(False)
     
-    # Fallback: If nothing selected, scan all meshes (Scene was reset)
-    if not imported_objects:
-        for obj in bpy.data.objects:
-            if obj.type == 'MESH':
-                imported_objects.append(obj)
+    all_objects = final_objects 
+    # Update context with new objects for subsequent ops
     
-    if imported_objects:
-        print(f"[Blender Debug] Imported {len(imported_objects)} objects.")
-        for obj in imported_objects:
-             # Ensure we track them
-             obj.select_set(True)
-        bpy.context.view_layer.objects.active = imported_objects[0]
-    else:
-        print("[Blender Debug] CRITICAL: No imported objects found!")
-        sys.stdout.flush()
-    
-    # Center Objects as a GROUP at (0, 0, 0)
-    # Calculate group bounds
-    group_center = Vector((0, 0, 0))
-    group_radius = 0.0
+    # Center Logic (Same as before)
+    min_x, max_x = float('inf'), float('-inf')
+    min_y, max_y = float('inf'), float('-inf')
+    min_z, max_z = float('inf'), float('-inf')
 
-    if imported_objects:
-        min_x, max_x = float('inf'), float('-inf')
-        min_y, max_y = float('inf'), float('-inf')
-        min_z, max_z = float('inf'), float('-inf')
-
-        for obj in imported_objects:
-             for corner in obj.bound_box:
-                 v = obj.matrix_world @ Vector(corner)
-                 if v.x < min_x: min_x = v.x
-                 if v.x > max_x: max_x = v.x
-                 if v.y < min_y: min_y = v.y
-                 if v.y > max_y: max_y = v.y
-                 if v.z < min_z: min_z = v.z
-                 if v.z > max_z: max_z = v.z
-        
-        print(f"[Blender Debug] Group Bounds: X[{min_x:.2f}, {max_x:.2f}] Y[{min_y:.2f}, {max_y:.2f}] Z[{min_z:.2f}, {max_z:.2f}]")
-        
-        center_x = (min_x + max_x) / 2
-        center_y = (min_y + max_y) / 2
-        center_z = (min_z + max_z) / 2
-        group_center = Vector((center_x, center_y, center_z))
-        
-        # Calculate Radius (Furthest point from/to center)
-        # Actually, simple box radius might suffice, but let's be safe
-        # Max distance from center to any box corner
-        max_dist_sq = 0.0
-        for obj in imported_objects:
-             for corner in obj.bound_box:
-                 v = obj.matrix_world @ Vector(corner)
-                 dist_sq = (v - group_center).length_squared
-                 if dist_sq > max_dist_sq:
-                     max_dist_sq = dist_sq
-        group_radius = math.sqrt(max_dist_sq)
-
-        print(f"[Blender Debug] Centering Group from ({center_x:.2f}, {center_y:.2f}, {center_z:.2f}) to (0,0,0) | Radius: {group_radius:.2f}")
-
-        # Move all objects
-        for obj in imported_objects:
-            obj.location.x -= center_x
-            obj.location.y -= center_y
-            obj.location.z -= center_z
-
-        # Update Scene
-        bpy.context.view_layer.update()
+    for obj in all_objects:
+         for corner in obj.bound_box:
+             v = obj.matrix_world @ Vector(corner)
+             if v.x < min_x: min_x = v.x
+             if v.x > max_x: max_x = v.x
+             if v.y < min_y: min_y = v.y
+             if v.y > max_y: max_y = v.y
+             if v.z < min_z: min_z = v.z
+             if v.z > max_z: max_z = v.z
     
-    if override_color:
-        # Create a new material with the override color
-        mat = bpy.data.materials.new(name="OverrideColor")
-        mat.use_nodes = True
-        nodes = mat.node_tree.nodes
-        bsdf = nodes.get("Principled BSDF")
-        if bsdf:
-            # Alpha 1.0
-            bsdf.inputs['Base Color'].default_value = (override_color[0], override_color[1], override_color[2], 1.0)
-            bsdf.inputs['Roughness'].default_value = 0.5
-        
-        # Apply to all imported objects
-        for obj in imported_objects:
-            if obj.type == 'MESH':
-                # Clear existing slots
-                obj.data.materials.clear()
-                obj.data.materials.append(mat)
+    center_x = (min_x + max_x) / 2
+    center_y = (min_y + max_y) / 2
+    center_z = (min_z + max_z) / 2
+    group_center = Vector((center_x, center_y, center_z))
     
-    # Setup Camera
+    max_dist_sq = 0.0
+    for obj in all_objects:
+         for corner in obj.bound_box:
+             v = obj.matrix_world @ Vector(corner)
+             dist_sq = (v - group_center).length_squared
+             if dist_sq > max_dist_sq:
+                 max_dist_sq = dist_sq
+    group_radius = math.sqrt(max_dist_sq)
+
+    # DISABLE Auto-Centering for Manual Generator
+    # main.ts already centers the geometry around the Global Model Center.
+    # Re-centering here causes "shifting" as the bounding box of visible parts changes per step.
+    # for obj in all_objects:
+    #     obj.location.x -= center_x
+    #     obj.location.y -= center_y
+    #     obj.location.z -= center_z
+
+    bpy.context.view_layer.update()
+    
+    # Camera Setup (Same as before)
     cam_data = bpy.data.cameras.new('Camera')
     cam_data.type = 'PERSP'
-    # Unity Reference: fieldOfView = 60 (Vertical)
-    # Since we use 1:1 aspect ratio, Vertical FOV = Horizontal FOV = 60
     fov_deg = 60.0
     fov_rad = math.radians(fov_deg)
     cam_data.angle = fov_rad 
     cam_data.clip_end = 5000 
-    cam_data.clip_start = 0.1 # Unity: 0.01
+    cam_data.clip_start = 0.1
     cam_obj = bpy.data.objects.new('Camera', cam_data)
     bpy.context.collection.objects.link(cam_obj)
     bpy.context.scene.camera = cam_obj
     
-    # Camera Transform
     loc_vec = Vector(cam_loc)
     look_at_vec = Vector(cam_look_at)
     up_vec = Vector(cam_up)
 
-    # Calculate direction, right, and adjusted up
     direction = (look_at_vec - loc_vec).normalized()
     right = direction.cross(up_vec).normalized()
     real_up = right.cross(direction).normalized()
 
-    # Blender Camera: -Z is forward, +Y is up, +X is right
-    # Construct Rotation Matrix
-    # Cols: X=Right, Y=Real_Up, Z=-Direction
     rot_mat = Matrix((right, real_up, -direction)).transposed()
-    
-    # Apply Transform
     cam_obj.location = loc_vec
     cam_obj.rotation_euler = rot_mat.to_euler()
 
-    print(f"[Blender Debug] Camera Location: {cam_obj.location}")
-    print(f"[Blender Debug] Camera Rotation: {cam_obj.rotation_euler}")
-    print(f"[Blender Debug] Camera Matrix World:\n{cam_obj.matrix_world}")
-    print(f"[Blender Debug] FOV: {fov_deg} deg")
-
-    # ---------------------------------------------------------
-    # Unity Reference Distance Calculation (LDrawCamera.cs)
-    # ---------------------------------------------------------
-    print(f"[Blender Debug] Group Radius: {group_radius:.2f}")
-    sys.stdout.flush()
-
     if group_radius > 0:
-        # Unity: verticalFOV = 60 * Deg2Rad
         vertical_fov = fov_rad
-        # aspect was hardcoded to 1.0, but now we respect resolution
         aspect = float(resolution_x) / float(resolution_y)
-        
-        # Unity: horizontalFOV = 2 * Atan(Tan(vFOV/2) * aspect)
         horizontal_fov = 2.0 * math.atan(math.tan(vertical_fov / 2.0) * aspect)
-        
-        # Unity: distanceV = radius / Tan(vFOV / 2)
         distance_v = group_radius / math.tan(vertical_fov / 2.0)
-        
-        # Unity: distanceH = radius / Tan(hFOV / 2)
         distance_h = group_radius / math.tan(horizontal_fov / 2.0)
-        
-        # Unity: distance = Max(distanceV, distanceH)
         base_distance = max(distance_v, distance_h)
-        
-        # Unity: distance = Max(distance + nearClip, distance * 1.2)
-        # User requested adjustment for truncation, increasing margin to 1.3
         near_clip = cam_data.clip_start
         final_distance = max(base_distance + near_clip, base_distance * 1.3)
-        
-        print(f"[Blender Debug] Reference Auto-Distance: {final_distance:.2f} (Radius: {group_radius:.2f}, FOV: 60)")
-        sys.stdout.flush()
-        
-        # Apply new distance along the camera's Z axis (backwards from target)
         new_loc = Vector((0,0,0)) - (direction * final_distance)
         cam_obj.location = new_loc
+
+    # ===========================================================================
+    # OVERRIDE COLOR (For Parts/Single Item Renders)
+    # ===========================================================================
+    if override_color:
+        mat_override = bpy.data.materials.new(name="OverrideColor")
+        mat_override.use_nodes = True
+        bsdf = mat_override.node_tree.nodes.get("Principled BSDF")
+        if bsdf:
+            # Revert sRGB conversion to match the vibrant "Step" style
+            # Treating input as Linear makes it appear brighter/more vibrant.
+            r = override_color[0]
+            g = override_color[1]
+            b = override_color[2]
+            
+            bsdf.inputs['Base Color'].default_value = (r, g, b, 1.0)
+            # Higher roughness for flatter, more cartoon/instruction look
+            bsdf.inputs['Roughness'].default_value = 0.8
+            # Low Specular to avoid greying out
+            bsdf.inputs['Specular IOR Level'].default_value = 0.2 
+            
+        for obj in all_objects:
+            if obj.type == 'MESH':
+                if obj.data.materials:
+                    # Replace first material (Main Color)
+                    obj.data.materials[0] = mat_override
+                else:
+                    obj.data.materials.append(mat_override)
         
-        print(f"[Blender Debug] Adjusted Camera Location: {new_loc}")
+        print(f"[Blender Debug] Applied Override Color: {override_color}")
 
-    # Lighting Setup (Standard Fixed 3-Point around Origin)
+    # ===========================================================================
+    # LIGHTING STAGE - AMBIENT ONLY
+    # ===========================================================================
     
-    # 1. Key Light (Sun)
-    key_light_data = bpy.data.lights.new(name="Key Light", type='SUN')
-    key_light_data.energy = 2.0 
-    key_light = bpy.data.objects.new(name="Key Light", object_data=key_light_data)
-    bpy.context.collection.objects.link(key_light)
-    key_light.location = (10, -10, 10) 
-    key_light.rotation_euler = (math.radians(45), math.radians(0), math.radians(45))
-
-    # 2. Fill Light (Area)
-    fill_light_data = bpy.data.lights.new(name="Fill Light", type='AREA')
-    fill_light_data.energy = 500
-    fill_light_data.size = 10
-    fill_light = bpy.data.objects.new(name="Fill Light", object_data=fill_light_data)
-    bpy.context.collection.objects.link(fill_light)
-    fill_light.location = (-10, -5, 5)
-    # Point at origin approximately
-    fill_light.rotation_euler = (math.radians(60), math.radians(0), math.radians(-45))
-
-    # 3. Back/Rim Light (Sun)
-    back_light_data = bpy.data.lights.new(name="Back Light", type='SUN')
-    back_light_data.energy = 1.0
-    back_light = bpy.data.objects.new(name="Back Light", object_data=back_light_data)
-    bpy.context.collection.objects.link(back_light)
-    back_light.location = (0, 10, 5) 
-    back_light.rotation_euler = (math.radians(-135), math.radians(0), math.radians(180))
-
-    # World / Ambient
+    # 1. World Background: Strong Ambient
     world = bpy.context.scene.world
     if not world:
         world = bpy.data.worlds.new("World")
         bpy.context.scene.world = world
-    world.use_nodes = True
-    bg_node = world.node_tree.nodes['Background']
-    bg_node.inputs[0].default_value = (1, 1, 1, 1) 
-    bg_node.inputs[1].default_value = 0.25 # Reduced from 0.4
+
+    try:
+        if hasattr(world, 'use_nodes'):
+             if not world.use_nodes:
+                 world.use_nodes = True
+        
+        w_tree = getattr(world, 'node_tree', None)
+        if w_tree and 'Background' in w_tree.nodes:
+            bg_node = w_tree.nodes['Background']
+            bg_node.inputs[0].default_value = (1, 1, 1, 1) # White
+            bg_node.inputs[1].default_value = 1.0 # Full Ambient Strength
+    except Exception as e:
+        print(f"[Blender Debug] World Setup Failed: {e}")
+
+    # No Directional Lights (Key/Fill/Rim removed)
+
+    # ===========================================================================
+    # LINE ART STAGE
+    # ===========================================================================
+    setup_line_art(all_objects)
 
     # Render Settings
     scene = bpy.context.scene
@@ -243,15 +361,10 @@ def setup_scene(obj_path, output_path, resolution_x, resolution_y, cam_loc, cam_
     scene.render.film_transparent = True
     scene.render.filepath = output_path
     
-    # Color Management: Standard (avoid Filmic desaturation)
+    # Use Standard transform to avoid Filmic desaturation
     scene.view_settings.view_transform = 'Standard'
     scene.view_settings.look = 'None'
 
-    # Eevee Settings for better quality
-    # scene.eevee.taa_render_samples = 64
-    # scene.eevee.use_gtao = True # Ambient Occlusion equivalent
-    
-    # Save Blend file for debugging
     if save_blend:
         blend_path = output_path.replace(".png", ".blend")
         bpy.ops.wm.save_as_mainfile(filepath=blend_path)
@@ -268,6 +381,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', required=False)
+    parser.add_argument('--model_new', required=False)
     parser.add_argument('--output', required=False)
     parser.add_argument('--width', type=int, default=512)
     parser.add_argument('--height', type=int, default=512)
@@ -287,12 +401,11 @@ if __name__ == "__main__":
     parser.add_argument('--r', type=float, required=False)
     parser.add_argument('--g', type=float, required=False)
     parser.add_argument('--b', type=float, required=False)
-    parser.add_argument('--save_blend', action='store_true', help="Save .blend file for debugging")
-    parser.add_argument('--batch', type=str, required=False, help="Path to batch JSON file")
+    parser.add_argument('--save_blend', action='store_true')
+    parser.add_argument('--batch', type=str, required=False)
     
     args = parser.parse_args(args)
     
-    # Convert sRGB (0-1) to Linear RGB for Blender
     def srgb_to_linear(c):
         if c <= 0.04045:
             return c / 12.92
@@ -303,12 +416,8 @@ if __name__ == "__main__":
         try:
             with open(args.batch, 'r') as f:
                 batch_jobs = json.load(f)
-                
-            print(f"[Blender Debug] Starting Batch Processing of {len(batch_jobs)} jobs...")
-            for i, job in enumerate(batch_jobs):
-                print(f"[Blender Debug] Processing Batch Job {i+1}/{len(batch_jobs)}")
-                
-                # Parse Color if present
+            
+            for job in batch_jobs:
                 job_color = None
                 if 'color' in job and job['color']:
                     c = job['color']
@@ -317,9 +426,8 @@ if __name__ == "__main__":
                         srgb_to_linear(c['g']), 
                         srgb_to_linear(c['b'])
                     )
-
                 setup_scene(
-                    job['input'],
+                    job.get('input'),
                     job['output'],
                     job['width'],
                     job['height'],
@@ -327,16 +435,16 @@ if __name__ == "__main__":
                     (job['lookAtX'], job['lookAtY'], job['lookAtZ']),
                     (job['upX'], job['upY'], job['upZ']),
                     job_color,
-                    save_blend=job.get('save_blend', False)
+                    save_blend=job.get('save_blend', False),
+                    delta_path=job.get('delta_input')
                 )
-                # Force garbage collection / cleanup if needed, but reset_scene should handle it
         except Exception as e:
              print(f"[Blender Debug] Batch Processing Failed: {e}")
              sys.exit(1)
              
     else:            
-        if not args.input or not args.output:
-            print("[Blender Debug] Error: --input and --output are required unless --batch is used.")
+        if not args.input and not args.batch and not args.model_new:
+            print("[Blender Debug] Error: --input or --batch or --model_new required.")
             sys.exit(1)
 
         color = None
@@ -360,5 +468,6 @@ if __name__ == "__main__":
             (args.lookAtX, args.lookAtY, args.lookAtZ),
             (args.upX, args.upY, args.upZ),
             color_linear,
-            save_blend=args.save_blend
+            save_blend=args.save_blend,
+            delta_path=args.model_new
         )
