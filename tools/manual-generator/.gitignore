@@ -1,0 +1,6 @@
+node_modules/
+output*/
+debug_*
+*.log
+.DS_Store
+dist/
